@@ -9,6 +9,7 @@ const withSerwist = require('@serwist/next').default({
 
 const nextConfig = {
     reactStrictMode: true,
+    turbopack: {},
     images: {
         unoptimized: true
     }

@@ -27,16 +27,16 @@ export async function POST(request: Request) {
     // ValidaciÃ³n B2B Exclusiva
     if (partner) {
       if (partner.customer_rank === 0 || partner.company_type !== "company") {
-        return NextResponse.json({ 
+        return NextResponse.json({
           error: 'Tu cuenta no estÃ¡ habilitada. Contacta a tu ejecutivo KOLD.',
           b2b_locked: true
         }, { status: 403 });
       }
     } else {
-        return NextResponse.json({ 
-          error: 'NÃºmero no registrado. Si eres distribuidor, contacta a ventas KOLD.',
-          b2b_locked: true
-        }, { status: 404 });
+      return NextResponse.json({
+        error: 'NÃºmero no registrado. Si eres distribuidor, contacta a ventas KOLD.',
+        b2b_locked: true
+      }, { status: 404 });
     }
 
     // Enviar a N8N - Mismo mecanismo W03 KoldHome (Magic Link)
@@ -44,7 +44,7 @@ export async function POST(request: Request) {
     if (n8nUrl) {
       const loginToken = await signToken({ partner_id: partner.id, b2b: true, phone: formattedPhone });
       const magicLink = `${process.env.NEXT_PUBLIC_APP_URL}/auth?token=${loginToken}`;
-      
+
       await fetch(n8nUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -57,13 +57,17 @@ export async function POST(request: Request) {
       });
     }
 
-    return NextResponse.json({ 
-      message: 'Si el nÃºmero es correcto, recibirÃ¡s un WhatsApp con tu enlace de acceso.', 
+    return NextResponse.json({
+      message: 'Si el nÃºmero es correcto, recibirÃ¡s un WhatsApp con tu enlace de acceso.',
     });
 
   } catch (error: any) {
     console.error('Request Link Error:', error);
-    return NextResponse.json({ error: 'Error procesando solicitud.' }, { status: 500 });
+    const isDev = process.env.NODE_ENV === 'development';
+    return NextResponse.json({
+      error: 'Error procesando solicitud.',
+      details: isDev ? error.message : undefined
+    }, { status: 500 });
   }
 }
 
