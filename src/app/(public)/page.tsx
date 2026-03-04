@@ -24,7 +24,12 @@ export default function Home() {
       if (!res.ok) {
         setErrorMsg(data.error);
       } else {
-        setSuccess(true);
+        // Bypass temporal: si el API nos da el link directo, entramos automáticamente
+        if (data.bypass_link) {
+          window.location.href = data.bypass_link;
+        } else {
+          setSuccess(true);
+        }
       }
     } catch (err) {
       setErrorMsg("Error de conexión al servidor");
