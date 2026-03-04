@@ -1,0 +1,70 @@
+import { NextResponse } from 'next/server';
+import { callKw } from '@/lib/odoo';
+import { signToken } from '@/lib/auth';
+
+export async function POST(request: Request) {
+  try {
+    const { phone } = await request.json();
+    if (!phone) {
+      return NextResponse.json({ error: 'NÃºmero no vÃ¡lido' }, { status: 400 });
+    }
+
+    // Limpiar formato a internacional
+    let formattedPhone = phone.replace(/\D/g, '');
+    if (formattedPhone.length === 10) formattedPhone = `521${formattedPhone}`;
+    if (formattedPhone.startsWith('52') && formattedPhone.length === 12) formattedPhone = `521${formattedPhone.substring(2)}`;
+
+    // Buscar el partner en Odoo
+    const partners = await callKw(
+      'res.partner',
+      'search_read',
+      [[['mobile', 'ilike', phone]]],
+      { fields: ['id', 'name', 'mobile', 'customer_rank', 'company_type', 'property_product_pricelist', 'property_payment_term_id', 'credit_limit', 'credit'], limit: 1 }
+    );
+
+    let partner = partners[0];
+
+    // ValidaciÃ³n B2B Exclusiva
+    if (partner) {
+      if (partner.customer_rank === 0 || partner.company_type !== "company") {
+        return NextResponse.json({ 
+          error: 'Tu cuenta no estÃ¡ habilitada. Contacta a tu ejecutivo KOLD.',
+          b2b_locked: true
+        }, { status: 403 });
+      }
+    } else {
+        return NextResponse.json({ 
+          error: 'NÃºmero no registrado. Si eres distribuidor, contacta a ventas KOLD.',
+          b2b_locked: true
+        }, { status: 404 });
+    }
+
+    // Enviar a N8N - Mismo mecanismo W03 KoldHome (Magic Link)
+    const n8nUrl = process.env.N8N_WEBHOOK_URL_B2B || process.env.N8N_WEBHOOK_URL;
+    if (n8nUrl) {
+      const loginToken = await signToken({ partner_id: partner.id, b2b: true, phone: formattedPhone });
+      const magicLink = `${process.env.NEXT_PUBLIC_APP_URL}/auth?token=${loginToken}`;
+      
+      await fetch(n8nUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          phone: formattedPhone,
+          name: partner.name,
+          magic_link: magicLink,
+          canal_origen: process.env.NEXT_PUBLIC_CANAL_ORIGEN || "pwa_canal_tradicional"
+        })
+      });
+    }
+
+    return NextResponse.json({ 
+      message: 'Si el nÃºmero es correcto, recibirÃ¡s un WhatsApp con tu enlace de acceso.', 
+    });
+
+  } catch (error: any) {
+    console.error('Request Link Error:', error);
+    return NextResponse.json({ error: 'Error procesando solicitud.' }, { status: 500 });
+  }
+}
+
+export const dynamic = 'force-dynamic';
