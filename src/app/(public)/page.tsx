@@ -4,6 +4,7 @@ import { Loader2 } from "lucide-react";
 
 export default function Home() {
   const [phone, setPhone] = useState("");
+  const [otp, setOtp] = useState("");
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
@@ -52,15 +53,64 @@ export default function Home() {
             <div className="w-16 h-16 bg-success/20 rounded-full flex items-center justify-center mx-auto mb-4 text-success text-2xl">
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
             </div>
-            <h3 className="font-bold text-lg mb-2 text-foreground">Revisa tu WhatsApp</h3>
-            <p className="text-sm text-muted-foreground">
-              Hemos enviado un enlace seguro al número <b className="text-foreground">{phone}</b>
+            <h3 className="font-bold text-lg mb-2 text-foreground">Ingresa tu código</h3>
+            <p className="text-sm text-muted-foreground mb-6">
+              Enviamos un código de 6 dígitos al <b>{phone}</b>
             </p>
+
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              if (otp.length !== 6) return;
+              setLoading(true);
+              setErrorMsg("");
+              try {
+                const res = await fetch("/api/auth/verify-code", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ code: otp })
+                });
+                const data = await res.json();
+                if (!res.ok) {
+                  setErrorMsg(data.error);
+                } else {
+                  window.location.href = data.redirect || '/';
+                }
+              } catch (err) {
+                setErrorMsg("Error al verificar código");
+              } finally {
+                setLoading(false);
+              }
+            }} className="space-y-4">
+              <input
+                type="text"
+                value={otp}
+                onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').substring(0, 6))}
+                placeholder="000000"
+                className="w-full h-16 text-center text-3xl tracking-[0.5em] font-bold bg-card border-none rounded-xl outline-none ring-1 ring-border focus:ring-2 focus:ring-primary shadow-sm"
+                autoFocus
+                maxLength={6}
+              />
+
+              {errorMsg && (
+                <div className="p-3 rounded-lg bg-danger/10 text-danger text-sm font-medium animate-in fade-in">
+                  {errorMsg}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={otp.length !== 6 || loading}
+                className="w-full h-14 rounded-xl bg-primary text-white font-bold tracking-wide transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:bg-primary/90 flex items-center justify-center gap-2 shadow-lg shadow-primary/20"
+              >
+                {loading ? <Loader2 className="animate-spin" /> : "Verificar e Ingresar"}
+              </button>
+            </form>
+
             <button
-              onClick={() => { setSuccess(false); setPhone(""); }}
-              className="mt-6 text-primary text-sm font-bold"
+              onClick={() => { setSuccess(false); setOtp(""); setErrorMsg(""); }}
+              className="mt-6 text-primary text-sm font-bold opacity-80 hover:opacity-100"
             >
-              Usar otro número
+              Cambiar número
             </button>
           </div>
         ) : (

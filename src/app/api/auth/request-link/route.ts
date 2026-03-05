@@ -55,12 +55,13 @@ export async function POST(request: Request) {
       }, { status: 404 });
     }
 
+    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const loginToken = await signToken({ partner_id: partner.id, b2b: true, phone: formattedPhone, otp: otpCode });
+    const magicLink = `${process.env.NEXT_PUBLIC_APP_URL}/auth?token=${loginToken}`;
+
     // Enviar a N8N - Mismo mecanismo W03 KoldHome (Magic Link)
     const n8nUrl = process.env.N8N_WEBHOOK_URL_B2B || process.env.N8N_WEBHOOK_URL;
     if (n8nUrl) {
-      const loginToken = await signToken({ partner_id: partner.id, b2b: true, phone: formattedPhone });
-      const magicLink = `${process.env.NEXT_PUBLIC_APP_URL}/auth?token=${loginToken}`;
-
       await fetch(n8nUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -68,10 +69,21 @@ export async function POST(request: Request) {
           phone: formattedPhone,
           name: partner.name,
           magic_link: magicLink,
+          codigo: otpCode,     // Soporte para OTP temporal de 6 dÃ­gitos
+          code: otpCode,       // Envialo tambiÃ©n como 'code' por si N8N lo espera asÃ­
           canal_origen: process.env.NEXT_PUBLIC_CANAL_ORIGEN || "pwa_canal_tradicional"
         })
       });
     }
+
+    // Guardar cookie temporal para validar el OTP en el siguiente request
+    const { cookies } = await import("next/headers");
+    (await cookies()).set('otp_session', loginToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 60 * 10 // 10 minutos
+    });
 
     return NextResponse.json({
       message: 'Si el número es correcto, recibirás un WhatsApp con tu enlace de acceso.',
