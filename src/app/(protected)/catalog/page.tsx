@@ -132,7 +132,7 @@ export default function Catalog() {
         addItem({
           product_id: itemConfig.id,
           name: itemConfig.name,
-          sku: itemConfig.sku,
+          sku: itemConfig.sku || "",
           price: itemConfig.price,
           uom_name: itemConfig.uom,
           qty: rawQty,
