@@ -66,8 +66,9 @@ export default function Catalog() {
     }
   }
 
-  const getCartQty = (id: number) => {
-    return cartItems.find(i => i.product_id === id)?.qty || "";
+  const getCartQty = (id: number): string => {
+    const item = cartItems.find(i => i.product_id === id);
+    return item ? String(item.qty) : "";
   }
 
   return (
@@ -127,7 +128,7 @@ export default function Catalog() {
                      <div className="flex justify-between items-start gap-2">
                         <h3 className="font-bold text-sm text-foreground leading-tight">{item.name}</h3>
                      </div>
-                     <p className="text-xs text-muted-foreground mt-1">SKU: {item.sku} &bull; {item.warning || `${item.uom}`}</p>
+                     <p className="text-xs text-muted-foreground mt-1">{item.sku ? `SKU: ${item.sku} · ` : ''}{item.warning || item.uom}</p>
                      
                      {item.boxSize > 1 && (
                         <span className="inline-block mt-1 bg-blue-50 text-primary text-[10px] font-bold px-1.5 py-0.5 rounded border border-blue-100">

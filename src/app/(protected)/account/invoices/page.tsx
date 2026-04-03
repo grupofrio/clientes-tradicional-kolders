@@ -31,7 +31,7 @@ export default function InvoicesPage() {
 
   const handleWhatsappTransfer = () => {
       if(!profile) return;
-      window.open(`https://wa.me/5218110000000?text=Hola.%20Adjunto%20comprobante%20de%20pago%20para%20la%20factura%20${showPaymentModal.name}%20del%20socio%20${profile.name}`, '_blank');
+      window.open(`https://wa.me/${process.env.NEXT_PUBLIC_WA_SALES || '5218110000000'}?text=Hola.%20Adjunto%20comprobante%20de%20pago%20para%20la%20factura%20${showPaymentModal.name}%20del%20socio%20${profile.name}`, '_blank');
       setShowPaymentModal(null);
   }
 

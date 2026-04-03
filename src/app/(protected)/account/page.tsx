@@ -35,7 +35,7 @@ export default function AccountPage() {
 
   const contactExecutive = () => {
       if(!partner) return;
-      window.open(`https://wa.me/5218110000000?text=Hola,%20soy%20${partner.name}.%20`, '_blank');
+      window.open(`https://wa.me/${process.env.NEXT_PUBLIC_WA_SALES || '5218110000000'}?text=Hola,%20soy%20${partner.name}.%20`, '_blank');
   }
 
   if (loading) {
