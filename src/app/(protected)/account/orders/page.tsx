@@ -14,9 +14,15 @@ export default function OrderHistory() {
 
   useEffect(() => {
     fetch('/api/b2b/orders/history')
-      .then(res => res.json())
+      .then(res => {
+        if (!res.ok) throw new Error('Error del servidor');
+        return res.json();
+      })
       .then(data => {
-        if (!data.error) setOrders(data);
+        if (Array.isArray(data)) setOrders(data);
+        setLoading(false);
+      })
+      .catch(() => {
         setLoading(false);
       });
   }, []);
@@ -25,8 +31,8 @@ export default function OrderHistory() {
      order.lines.forEach((line: any) => {
          addItem({
              product_id: line.product_id,
-             name: line.name,
-             sku: "REORDER",
+             name: line.name.split('\n')[0],
+             sku: '',
              price: line.price,
              uom_name: line.uom,
              qty: line.qty,

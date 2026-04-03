@@ -15,27 +15,31 @@ export default function AccountPage() {
 
   useEffect(() => {
     Promise.all([
-        fetch('/api/account/profile').then(res => res.json()),
-        fetch('/api/b2b/invoices').then(res => res.json())
+        fetch('/api/account/profile').then(res => res.ok ? res.json() : null),
+        fetch('/api/b2b/invoices').then(res => res.ok ? res.json() : [])
     ]).then(([profileData, invData]) => {
-        if (!profileData.error) setPartner(profileData);
-        if (!invData.error && Array.isArray(invData)) {
+        if (profileData && !profileData.error) setPartner(profileData);
+        if (Array.isArray(invData)) {
             const overdue = invData.filter((i: any) => new Date(i.invoice_date_due) < new Date()).length;
             setOverdueInvoices(overdue);
         }
         setLoading(false);
+    }).catch(() => {
+        setLoading(false);
     });
   }, []);
 
-  const handleLogout = () => {
-    document.cookie = "session=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;";
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+    } catch (_) {}
     clearCart();
     router.replace("/");
   };
 
   const contactExecutive = () => {
       if(!partner) return;
-      window.open(`https://wa.me/${process.env.NEXT_PUBLIC_WA_SALES || '5218110000000'}?text=Hola,%20soy%20${partner.name}.%20`, '_blank');
+      window.open(`https://wa.me/${process.env.NEXT_PUBLIC_WA_SALES || '5218110000000'}?text=${encodeURIComponent(`Hola, soy ${partner.name}. `)}`, '_blank');
   }
 
   if (loading) {

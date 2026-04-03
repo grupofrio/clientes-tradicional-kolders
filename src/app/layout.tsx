@@ -20,7 +20,7 @@ export default function RootLayout({
   return (
     <html lang="es" className="antialiased">
       <head>
-        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
       </head>
       <body>
         <div className="max-w-md mx-auto min-h-screen bg-background relative overflow-x-hidden shadow-2xl">

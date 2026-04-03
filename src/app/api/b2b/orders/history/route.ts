@@ -13,14 +13,15 @@ export async function GET() {
     if (!payload?.partner_id || !payload.b2b) return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
 
     const orders = await callKw('sale.order', 'search_read', [
-       [['partner_id', '=', payload.partner_id], ['state', 'in', ['draft', 'sent', 'sale', 'done', 'cancel']], ['x_studio_canal_origen', 'in', ['pwa_canal_tradicional', 'manual', 'botpress']]]
+       [['partner_id', '=', payload.partner_id], ['state', 'in', ['draft', 'sent', 'sale', 'done', 'cancel']], ['x_studio_canal_origen', 'in', ['pwa_canal_tradicional', 'botpress']]]
     ], {
        fields: ['name', 'amount_total', 'state', 'date_order', 'commitment_date', 'invoice_status', 'payment_term_id'],
        order: 'date_order desc',
        limit: 30
     });
 
-    const detailedOrders = await Promise.all(orders.map(async (o: any) => {
+    // Usar allSettled para que un fallo en una orden no mate toda la lista
+    const results = await Promise.allSettled(orders.map(async (o: any) => {
          const lines = await callKw('sale.order.line', 'search_read', [
              [['order_id', '=', o.id]]
          ], { fields: ['product_id', 'product_uom_qty', 'price_unit', 'name', 'product_uom'] });
@@ -37,11 +38,15 @@ export async function GET() {
          };
     }));
 
+    const detailedOrders = results
+      .filter((r): r is PromiseFulfilledResult<any> => r.status === 'fulfilled')
+      .map(r => r.value);
+
     return NextResponse.json(detailedOrders);
 
   } catch (error) {
     console.error('History API Error:', error);
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    return NextResponse.json({ error: 'Error cargando historial de pedidos' }, { status: 500 });
   }
 }
 

@@ -9,104 +9,157 @@ export async function POST(request: Request) {
     if (!sessionCookie) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
 
     const payload = await verifyToken(sessionCookie);
-    if (!payload?.partner_id || !payload.b2b) return NextResponse.json({ error: 'Token B2B invÃ¡lido' }, { status: 401 });
+    if (!payload?.partner_id || !payload.b2b) return NextResponse.json({ error: 'Sesión inválida' }, { status: 401 });
 
     const { cart_lines, delivery_date, delivery_schedule, payment_method, notes } = await request.json();
 
-    if (!cart_lines || cart_lines.length === 0) {
-      return NextResponse.json({ error: 'Carrito vacÃ­o' }, { status: 400 });
+    // Validación de input
+    if (!cart_lines || !Array.isArray(cart_lines) || cart_lines.length === 0) {
+      return NextResponse.json({ error: 'El carrito está vacío' }, { status: 400 });
+    }
+
+    // Validar fecha de entrega
+    if (!delivery_date || !/^\d{4}-\d{2}-\d{2}$/.test(delivery_date)) {
+      return NextResponse.json({ error: 'Fecha de entrega inválida' }, { status: 400 });
+    }
+    const deliveryDateObj = new Date(delivery_date + 'T12:00:00');
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (deliveryDateObj <= today) {
+      return NextResponse.json({ error: 'La fecha de entrega debe ser posterior a hoy' }, { status: 400 });
+    }
+
+    // Validar cada línea del carrito
+    for (const line of cart_lines) {
+      if (!line.product_id || typeof line.product_id !== 'number') {
+        return NextResponse.json({ error: 'Producto inválido en el carrito' }, { status: 400 });
+      }
+      if (!line.qty || typeof line.qty !== 'number' || line.qty < 1) {
+        return NextResponse.json({ error: `Cantidad inválida para ${line.name || 'producto'}` }, { status: 400 });
+      }
     }
 
     const partnerId = payload.partner_id;
 
     // 1. Obtener datos frescos del partner
     const partnerData = await callKw('res.partner', 'search_read', [[['id', '=', partnerId]]], {
-      fields: ['name', 'credit_limit', 'credit', 'property_payment_term_id', 'property_product_pricelist', 'user_id'],
+      fields: ['name', 'credit_limit', 'credit', 'property_payment_term_id', 'property_product_pricelist', 'user_id', 'company_id'],
       limit: 1
     });
 
-    if (!partnerData.length) return NextResponse.json({ error: 'Partner no encontrado' }, { status: 404 });
+    if (!partnerData.length) return NextResponse.json({ error: 'Cuenta no encontrada' }, { status: 404 });
     const partner = partnerData[0];
 
-    // 2. Definir Pricelist y Payment Term
-    const pricelistId = partner.property_product_pricelist ? partner.property_product_pricelist[0] : 81; // 81 = Fallback
+    // 2. Verificar precios reales desde Odoo
+    const productIds = cart_lines.map((l: any) => l.product_id);
+    const products = await callKw('product.product', 'search_read', [[['id', 'in', productIds]]], {
+      fields: ['id', 'lst_price', 'list_price', 'name'],
+    });
 
-    // El B2B usa el payment term de su ficha SOLO si seleccionÃ³ credito activo, si no es inmediato.
+    const productPriceMap: Record<number, { price: number; name: string }> = {};
+    for (const p of products) {
+      productPriceMap[p.id] = { price: p.lst_price || p.list_price || 0, name: p.name };
+    }
+
+    // Validar que todos los productos existen y precios son razonables
+    for (const line of cart_lines) {
+      const serverProduct = productPriceMap[line.product_id];
+      if (!serverProduct) {
+        return NextResponse.json({ error: `Producto no encontrado: ${line.name || line.product_id}` }, { status: 400 });
+      }
+      // Usar precio real del servidor, no el del cliente
+    }
+
+    // 3. Definir Pricelist y Payment Term
+    const pricelistId = partner.property_product_pricelist ? partner.property_product_pricelist[0] : 81;
+
     let paymentTermId = false;
     if (payment_method === 'credito' && partner.property_payment_term_id) {
       paymentTermId = partner.property_payment_term_id[0];
     }
 
-    // 3. Crear el formato `order_line` [(0, 0, {...})]
+    // 4. Crear el formato order_line con precios REALES del servidor
     const odooOrderLines = cart_lines.map((l: any) => {
-      let nameWithNote = l.name;
-      if (l.note && l.note.trim() !== "") nameWithNote += `\nInstrucciÃ³n Comercial: ${l.note}`;
+      const serverPrice = productPriceMap[l.product_id]?.price || l.price;
+      let nameWithNote = productPriceMap[l.product_id]?.name || l.name;
+      if (l.note && typeof l.note === 'string' && l.note.trim() !== "") {
+        nameWithNote += `\nInstrucción Comercial: ${l.note.substring(0, 500)}`;
+      }
 
       return [0, 0, {
         product_id: l.product_id,
         product_uom_qty: l.qty,
-        price_unit: l.price,
+        price_unit: serverPrice,
         name: nameWithNote
       }];
     });
 
-    // 4. Calcular importes transaccionales (simulados en back) para evaluar riesgo crediticio
-    const subtotal = cart_lines.reduce((tot: number, item: any) => tot + (item.price * item.qty), 0);
-    const total_con_iva = subtotal * 1.16;
+    // 5. Calcular importes con precios reales
+    const subtotal = cart_lines.reduce((tot: number, item: any) => {
+      const serverPrice = productPriceMap[item.product_id]?.price || item.price;
+      return tot + (serverPrice * item.qty);
+    }, 0);
+    const total_con_iva = Math.round(subtotal * 1.16 * 100) / 100;
 
     const credito_disponible = partner.credit_limit - partner.credit;
     const supera_credito = total_con_iva > credito_disponible;
 
-    // 5. Crear la CotizaciÃ³n (sale.order) en Draft
+    // 6. Company ID desde partner o env
+    const companyId = partner.company_id ? partner.company_id[0] : parseInt(process.env.ODOO_COMPANY_ID || '34');
+
+    // 7. Crear la Cotización (sale.order) en Draft
     const orderFormat = {
       partner_id: partnerId,
-      company_id: 34,
+      company_id: companyId,
       pricelist_id: pricelistId,
       payment_term_id: paymentTermId,
       x_studio_canal_origen: "pwa_canal_tradicional",
-      x_studio_horario_de_entrega_solicitado: delivery_schedule,
+      x_studio_horario_de_entrega_solicitado: delivery_schedule || '',
       commitment_date: `${delivery_date} 12:00:00`,
-      note: notes,
+      note: typeof notes === 'string' ? notes.substring(0, 2000) : '',
       order_line: odooOrderLines,
     };
 
     const orderId = await callKw('sale.order', 'create', [orderFormat]);
 
-    // Obtener el Nombre (Name) SO generado
+    // Obtener el Name (SO) generado
     const orderInfo = await callKw('sale.order', 'search_read', [[['id', '=', orderId]]], {
       fields: ['name'], limit: 1
     });
     const orderName = orderInfo[0]?.name || `ID-${orderId}`;
 
-    // 6. Regla de ConfirmaciÃ³n AutomÃ¡tica
+    // 8. Regla de Confirmación Automática
     let finalStatus = "draft";
     if (partner.credit_limit > 0 && !supera_credito && payment_method === 'credito') {
-      // Tienen crÃ©dito activo y el pedido entra perfecto -> Se auto confirma a sales order.
       await callKw('sale.order', 'action_confirm', [[orderId]]);
       finalStatus = "confirmed";
     }
 
-    // 7. Notificar n8n Ejecutivo Comercial (Webhook W04b o genÃ©rico configurado)
+    // 9. Notificar n8n Ejecutivo Comercial
     const webhookUrl = process.env.N8N_WEBHOOK_URL_B2B || process.env.N8N_WEBHOOK_URL;
     if (webhookUrl) {
-      fetch(webhookUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          tipo: "cotizacion_b2b",
-          order_id: orderId,
-          order_name: orderName,
-          partner_name: partner.name,
-          partner_id: partnerId,
-          total: total_con_iva,
-          supera_credito: supera_credito,
-          ejecutivo_id: partner.user_id ? partner.user_id[0] : null,
-          canal: "pwa_canal_tradicional"
-        })
-      }).catch(e => console.error("Error al enviar N8N Webhook transaccional: ", e));
+      try {
+        await fetch(webhookUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            tipo: "cotizacion_b2b",
+            order_id: orderId,
+            order_name: orderName,
+            partner_name: partner.name,
+            partner_id: partnerId,
+            total: total_con_iva,
+            supera_credito: supera_credito,
+            ejecutivo_id: partner.user_id ? partner.user_id[0] : null,
+            canal: "pwa_canal_tradicional"
+          })
+        });
+      } catch (webhookError) {
+        console.error("Error al enviar webhook N8N (orden):", webhookError);
+      }
     }
 
-    // 8. Output a Front-End
+    // 10. Response
     return NextResponse.json({
       order_id: orderId,
       order_name: orderName,
@@ -120,7 +173,7 @@ export async function POST(request: Request) {
 
   } catch (error) {
     console.error('B2B Create Order error:', error);
-    return NextResponse.json({ error: 'Error del servidor al crear Ã³rden en Odoo' }, { status: 500 });
+    return NextResponse.json({ error: 'Error al crear la orden. Intenta nuevamente.' }, { status: 500 });
   }
 }
 

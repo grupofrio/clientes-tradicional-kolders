@@ -1,11 +1,12 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useB2BCartStore } from "@/store/cart";
-import { Search, Loader2 } from "lucide-react";
+import { Search, Loader2, AlertCircle } from "lucide-react";
 
 export default function Catalog() {
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("Todas");
 
@@ -23,29 +24,39 @@ export default function Catalog() {
       .then(res => res.json())
       .then(data => {
         if (!data.error) setPartner(data);
-      });
+      })
+      .catch(() => {});
 
     // 2. Traer items
+    setError("");
     fetch(`/api/catalog?category=${category}`)
-      .then(res => res.json())
+      .then(res => {
+        if (!res.ok) throw new Error('Error del servidor');
+        return res.json();
+      })
       .then(data => {
-        setItems(data);
+        if (Array.isArray(data)) {
+          setItems(data);
+        } else {
+          setItems([]);
+          setError("No se pudieron cargar los productos.");
+        }
         setLoading(false);
+      })
+      .catch(() => {
+        setLoading(false);
+        setError("Error de conexión. Verifica tu red e intenta de nuevo.");
       });
   }, [category]);
 
-  const filteredItems = items.filter(item => 
-    item.name.toLowerCase().includes(search.toLowerCase()) || 
+  const filteredItems = items.filter(item =>
+    item.name.toLowerCase().includes(search.toLowerCase()) ||
     (item.sku && item.sku.toLowerCase().includes(search.toLowerCase()))
   );
 
   const handleQtyChange = (product_id: number, e: any, itemConfig: any) => {
     let rawQty = parseInt(e.target.value) || 0;
-    
-    // Validar múltiplos si aplica warning message o default a 1.
-    // Lógica para permitir teclear libre si es B2B transaccional.
-    
-    // Si ya está en carrito, updatear. Si no, agregarlo full array.
+
     const cartExists = cartItems.find(i => i.product_id === product_id);
     if (rawQty === 0 && cartExists) {
         useB2BCartStore.getState().removeItem(product_id);
@@ -88,9 +99,9 @@ export default function Catalog() {
 
            <div className="relative mt-2">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
-              <input 
-                 type="text" 
-                 placeholder="Buscar por nombre o SKU..." 
+              <input
+                 type="text"
+                 placeholder="Buscar por nombre o SKU..."
                  value={search}
                  onChange={(e) => setSearch(e.target.value)}
                  className="w-full h-11 bg-white rounded-lg pl-10 pr-4 text-sm text-foreground outline-none border-none focus:ring-2 focus:ring-accent"
@@ -117,34 +128,45 @@ export default function Catalog() {
         <main className="px-3 py-4 space-y-3">
           {loading ? (
              <div className="flex justify-center p-10"><Loader2 className="animate-spin text-primary w-8 h-8" /></div>
+          ) : error ? (
+             <div className="text-center p-10 bg-white border border-danger/20 rounded-xl">
+                <AlertCircle size={32} className="text-danger mx-auto mb-3" />
+                <p className="text-danger text-sm font-bold mb-3">{error}</p>
+                <button
+                  onClick={() => { setLoading(true); setError(""); setCategory(category); }}
+                  className="text-primary text-sm font-bold underline"
+                >
+                  Reintentar
+                </button>
+             </div>
           ) : filteredItems.length === 0 ? (
              <div className="text-center p-10 text-muted-foreground text-sm">No se encontraron productos.</div>
           ) : (
             filteredItems.map(item => (
               <div key={item.id} className="bg-white rounded-xl border border-border p-3 flex gap-3 shadow-sm hover:border-primary/50 transition-colors">
-                
+
                 <div className="flex-1 flex flex-col justify-between">
                   <div>
                      <div className="flex justify-between items-start gap-2">
                         <h3 className="font-bold text-sm text-foreground leading-tight">{item.name}</h3>
                      </div>
                      <p className="text-xs text-muted-foreground mt-1">{item.sku ? `SKU: ${item.sku} · ` : ''}{item.warning || item.uom}</p>
-                     
+
                      {item.boxSize > 1 && (
                         <span className="inline-block mt-1 bg-blue-50 text-primary text-[10px] font-bold px-1.5 py-0.5 rounded border border-blue-100">
-                          📦 Caja máster: {item.boxSize} pzas
+                          Caja máster: {item.boxSize} pzas
                         </span>
                      )}
                   </div>
-                  
+
                   <div className="mt-3 flex items-center justify-between">
                      <div>
                        <span className="font-extrabold text-foreground text-base">${item.price.toFixed(2)}</span>
                        <span className="text-[10px] text-muted-foreground ml-1">/ {item.uom}</span>
                      </div>
                      <div className="relative">
-                        <input 
-                           type="number" 
+                        <input
+                           type="number"
                            min="0"
                            value={getCartQty(item.id)}
                            onChange={(e) => handleQtyChange(item.id, e, item)}

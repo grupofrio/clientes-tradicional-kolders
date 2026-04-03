@@ -14,11 +14,13 @@ export default function InvoicesPage() {
 
   useEffect(() => {
     Promise.all([
-        fetch('/api/b2b/invoices').then(res => res.json()),
-        fetch('/api/account/profile').then(res => res.json())
+        fetch('/api/b2b/invoices').then(res => res.ok ? res.json() : []),
+        fetch('/api/account/profile').then(res => res.ok ? res.json() : null)
     ]).then(([invData, profData]) => {
-        if (!invData.error) setInvoices(invData);
-        if (!profData.error) setProfile(profData);
+        if (Array.isArray(invData)) setInvoices(invData);
+        if (profData && !profData.error) setProfile(profData);
+        setLoading(false);
+    }).catch(() => {
         setLoading(false);
     });
   }, []);
@@ -31,7 +33,7 @@ export default function InvoicesPage() {
 
   const handleWhatsappTransfer = () => {
       if(!profile) return;
-      window.open(`https://wa.me/${process.env.NEXT_PUBLIC_WA_SALES || '5218110000000'}?text=Hola.%20Adjunto%20comprobante%20de%20pago%20para%20la%20factura%20${showPaymentModal.name}%20del%20socio%20${profile.name}`, '_blank');
+      window.open(`https://wa.me/${process.env.NEXT_PUBLIC_WA_SALES || '5218110000000'}?text=${encodeURIComponent(`Hola. Adjunto comprobante de pago para la factura ${showPaymentModal.name} del socio ${profile.name}`)}`, '_blank');
       setShowPaymentModal(null);
   }
 

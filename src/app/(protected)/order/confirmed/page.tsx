@@ -23,9 +23,9 @@ function ConfirmationContent() {
          const data = await res.json();
          // If a phone exists in a full user fetch, we would use it. We'll fallback to a base WA format.
          // In a deep integration we would fetch `res.users` for the exact phone number.
-         window.open(`https://wa.me/${process.env.NEXT_PUBLIC_WA_SALES || '5218110000000'}?text=Hola%20soy%20${data.name}%20(B2B).%20Quisiera%20saber%20sobre%20mi%20pedido%20${orderName}`, '_blank');
+         window.open(`https://wa.me/${process.env.NEXT_PUBLIC_WA_SALES || '5218110000000'}?text=${encodeURIComponent(`Hola soy ${data.name} (B2B). Quisiera saber sobre mi pedido ${orderName}`)}`, '_blank');
      } catch (e) {
-         window.open(`https://wa.me/${process.env.NEXT_PUBLIC_WA_SALES || '5218110000000'}?text=Hola.%20Quisiera%20saber%20sobre%20mi%20pedido%20${orderName}`, '_blank');
+         window.open(`https://wa.me/${process.env.NEXT_PUBLIC_WA_SALES || '5218110000000'}?text=${encodeURIComponent(`Hola. Quisiera saber sobre mi pedido ${orderName}`)}`, '_blank');
      }
   };
 

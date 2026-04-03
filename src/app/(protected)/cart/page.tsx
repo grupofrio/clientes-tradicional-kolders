@@ -10,12 +10,12 @@ import Link from "next/link";
 export default function CartPage() {
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
-  
+
   const { items, setQty, setNote, removeItem, clearCart, getTotal } = useB2BCartStore();
-  
+
   const [partner, setPartner] = useState<any>(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
-  
+
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [checkoutError, setCheckoutError] = useState("");
 
@@ -36,6 +36,9 @@ export default function CartPage() {
           }
         }
         setLoadingProfile(false);
+      })
+      .catch(() => {
+        setLoadingProfile(false);
       });
   }, []);
 
@@ -45,7 +48,7 @@ export default function CartPage() {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 text-center">
          <div className="w-20 h-20 bg-muted rounded-full flex items-center justify-center text-muted-foreground mb-4">
-            🛒
+            <Trash2 size={32} />
          </div>
          <h1 className="text-xl font-bold font-display text-foreground mb-2">Tu carrito está vacío</h1>
          <p className="text-sm text-muted-foreground mb-8 text-balance">
@@ -59,8 +62,8 @@ export default function CartPage() {
   }
 
   const subtotal = getTotal();
-  const iva = subtotal * 0.16;
-  const total = subtotal + iva;
+  const iva = Math.round(subtotal * 0.16 * 100) / 100;
+  const total = Math.round((subtotal + iva) * 100) / 100;
 
   let creditoDisponible = 0;
   let superaCredito = false;
@@ -70,9 +73,10 @@ export default function CartPage() {
   }
 
   const handleCheckout = async () => {
+    if (checkoutLoading) return; // Prevenir doble-click
     setCheckoutLoading(true);
     setCheckoutError("");
-    
+
     try {
       const res = await fetch('/api/b2b/orders/create', {
         method: 'POST',
@@ -90,13 +94,13 @@ export default function CartPage() {
 
       const data = await res.json();
       if (!res.ok) {
-        setCheckoutError(data.error || "A problem occurred creating the B2B Order.");
+        setCheckoutError(data.error || "Error al crear la orden. Intenta nuevamente.");
       } else {
         clearCart();
         router.push(`/order/confirmed?orderName=${data.order_name}&status=${data.status}&executive=${encodeURIComponent(data.ejecutivo_nombre)}&executiveId=${data.ejecutivo_id}`);
       }
     } catch (e) {
-      setCheckoutError("System Error processing wholesale order.");
+      setCheckoutError("Error de conexión. Verifica tu red e intenta de nuevo.");
     } finally {
       setCheckoutLoading(false);
     }
@@ -132,28 +136,28 @@ export default function CartPage() {
                       {items.map(l => (
                          <tr key={l.product_id} className="border-b border-border/50 text-foreground font-medium">
                             <td className="px-3 py-3 w-full">
-                               <div className="text-xs font-bold truncate max-w-[120px]">{l.name}</div>
+                               <div className="text-xs font-bold truncate max-w-[180px]" title={l.name}>{l.name}</div>
                                <div className="text-[10px] text-muted-foreground flex gap-2 mt-0.5">
-                                 <span>{l.sku}</span>
+                                 {l.sku && <span>{l.sku}</span>}
                                  <span className="text-primary font-bold">${l.price.toFixed(2)}</span>
                                </div>
-                               <input 
-                                  className="w-full mt-2 bg-secondary text-xs h-6 px-2 rounded outline-none placeholder:text-muted-foreground" 
-                                  placeholder="Nota..." 
-                                  value={l.note || ''} 
-                                  onChange={e => setNote(l.product_id, e.target.value)} 
+                               <input
+                                  className="w-full mt-2 bg-secondary text-xs h-6 px-2 rounded outline-none placeholder:text-muted-foreground"
+                                  placeholder="Nota..."
+                                  value={l.note || ''}
+                                  onChange={e => setNote(l.product_id, e.target.value)}
                                />
                             </td>
                             <td className="px-3 py-3 text-center w-24 align-top pt-3.5">
-                               <input 
-                                  type="number" 
-                                  value={l.qty} 
-                                  onChange={e => setQty(l.product_id, parseInt(e.target.value)||1)} 
+                               <input
+                                  type="number"
+                                  value={l.qty}
+                                  onChange={e => setQty(l.product_id, parseInt(e.target.value)||1)}
                                   className="w-16 h-8 text-center text-sm font-bold bg-secondary border border-border rounded"
                                />
                             </td>
                             <td className="px-3 py-3 text-right align-top pt-4">
-                               <span className="font-extrabold text-sm">${(l.price * l.qty).toLocaleString('en-US', {minimumFractionDigits: 2})}</span>
+                               <span className="font-extrabold text-sm">${(Math.round(l.price * l.qty * 100) / 100).toLocaleString('en-US', {minimumFractionDigits: 2})}</span>
                             </td>
                             <td className="px-3 py-3 text-right align-top pt-4 text-danger">
                                <button onClick={() => removeItem(l.product_id)}><Trash2 size={16} /></button>
@@ -167,9 +171,9 @@ export default function CartPage() {
             {/* Detalles de Entrega */}
             <div className="bg-white border border-border rounded-xl p-4 shadow-sm space-y-4">
                 <h3 className="font-bold text-foreground mb-4">Logística B2B</h3>
-                
+
                 <div className="space-y-1">
-                   <label className="text-xs font-bold text-muted-foreground uppercase">📍 Sucursal de Entrega</label>
+                   <label className="text-xs font-bold text-muted-foreground uppercase">Sucursal de Entrega</label>
                    <div className="w-full h-11 bg-secondary rounded-lg px-3 flex items-center text-sm">
                       {loadingProfile ? <Loader2 size={16} className="animate-spin text-muted-foreground" /> : <span className="font-medium truncate">{partner?.address || 'Dirección principal no registrada'}</span>}
                    </div>
@@ -178,8 +182,8 @@ export default function CartPage() {
                 <div className="grid grid-cols-2 gap-3">
                    <div className="space-y-1">
                       <label className="text-xs font-bold text-muted-foreground uppercase">Fecha (Mín 24h)</label>
-                      <input 
-                         type="date" 
+                      <input
+                         type="date"
                          min={format(addDays(new Date(), 1), "yyyy-MM-dd")}
                          value={dateStr}
                          onChange={e => setDateStr(e.target.value)}
@@ -188,8 +192,8 @@ export default function CartPage() {
                    </div>
                    <div className="space-y-1">
                       <label className="text-xs font-bold text-muted-foreground uppercase">Horario</label>
-                      <select 
-                         value={horario} 
+                      <select
+                         value={horario}
                          onChange={e => setHorario(e.target.value)}
                          className="w-full h-11 bg-white border border-border rounded-lg px-3 text-sm font-bold outline-none focus:ring-2 focus:ring-primary"
                       >
@@ -204,6 +208,7 @@ export default function CartPage() {
                    <textarea
                      value={notes}
                      onChange={e => setNotes(e.target.value)}
+                     maxLength={2000}
                      className="w-full h-20 resize-none bg-white border border-border rounded-lg p-3 text-sm outline-none focus:ring-2 focus:ring-primary placeholder:text-muted-foreground"
                      placeholder="Ej: Solo recibir por entrada trasera..."
                    />
@@ -213,7 +218,7 @@ export default function CartPage() {
              {/* Detalles Pago / Financiero */}
              <div className="bg-white border border-border rounded-xl p-4 shadow-sm space-y-4">
                 <h3 className="font-bold text-foreground mb-1">Términos Comerciales</h3>
-                
+
                 <div className="p-3 bg-secondary rounded-lg mb-4">
                    <div className="flex justify-between items-center text-sm font-medium mb-1">
                       <span>Subtotal Operativo (sin IVA)</span>
@@ -233,7 +238,7 @@ export default function CartPage() {
                     <>
                     <div className="space-y-1 mb-4">
                        <label className="text-xs font-bold text-muted-foreground uppercase">Método para esta orden</label>
-                       <select 
+                       <select
                          value={paymentMethod}
                          onChange={e => setPaymentMethod(e.target.value)}
                          className="w-full h-11 bg-white border border-border rounded-lg px-3 text-sm font-bold outline-none focus:ring-2 focus:ring-primary"
@@ -258,19 +263,19 @@ export default function CartPage() {
                              <div className="flex justify-between font-bold text-sm">
                                <span>Disponible tras pedido:</span>
                                <span className={superaCredito ? 'font-extrabold underline' : ''}>
-                                  ${(creditoDisponible - total).toLocaleString('en-US', {minimumFractionDigits: 2})}
+                                  ${(Math.round((creditoDisponible - total) * 100) / 100).toLocaleString('en-US', {minimumFractionDigits: 2})}
                                </span>
                             </div>
-                            {superaCredito && <p className="text-[10px] mt-2 font-bold leading-tight">⚠️ Esta operación supera tu límite de crédito. Pasará a revisión Comercial como Cotización.</p>}
-                            {!superaCredito && <p className="text-[10px] mt-2 font-bold leading-tight text-success">✅ Operación viable. El pedido se confirmará y descontará de tu línea en automático.</p>}
+                            {superaCredito && <p className="text-[10px] mt-2 font-bold leading-tight">Esta operación supera tu límite de crédito. Pasará a revisión Comercial como Cotización.</p>}
+                            {!superaCredito && <p className="text-[10px] mt-2 font-bold leading-tight text-success">Operación viable. El pedido se confirmará y descontará de tu línea en automático.</p>}
                         </div>
                     )}
                     </>
                 )}
 
                 {checkoutError && <p className="text-danger text-sm font-bold mt-2">{checkoutError}</p>}
-                
-                <button 
+
+                <button
                   onClick={handleCheckout}
                   disabled={checkoutLoading || loadingProfile}
                   className="w-full h-14 mt-4 rounded-xl bg-primary text-white font-bold tracking-wide transition-all disabled:opacity-50 flex items-center justify-center shadow-lg shadow-primary/20 hover:bg-primary/90"
