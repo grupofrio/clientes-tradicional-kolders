@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { callKw } from '@/lib/odoo';
 import { verifyToken } from '@/lib/auth';
+import { resolvePricesForPartner } from '@/lib/pricelist';
 import { cookies } from 'next/headers';
 
 /**
@@ -94,16 +95,41 @@ export async function GET() {
       }
     }
 
+    // ── P0 FIX: aplicar pricelist del partner antes de devolver precios ──
+    // Antes: catalog devolvía `lst_price` crudo, que ignora overrides de pricelist.
+    // Ej. en pl=1 (Predeterminado MXN), product.id=86 tiene lst_price=$6 PERO el
+    // item del pricelist lo fija en $10. El cobro real al confirmar sería $10.
+    // Mostrar el precio correcto evita sorpresas en checkout y discrepancias con
+    // sale.order.line.price_unit (que Odoo computa con el mismo pricelist).
+    const productIdsForPricing: number[] = ptItems.map((it: { id: number }) => it.id);
+    let pricelistMap: Record<number, { price: number; base: number; appliedItemId: number | null; rule: string }> = {};
+    try {
+      pricelistMap = await resolvePricesForPartner(Number(payload.partner_id), productIdsForPricing);
+    } catch (priceErr) {
+      console.warn('[B2B_PRICING] resolver failed, falling back to lst_price', priceErr);
+      // Fallback defensivo: usar lst_price si el resolver explota — preferimos
+      // devolver catálogo "viejo" antes que romper la UI.
+      for (const item of ptItems) {
+        const base = item.lst_price || item.list_price || 0;
+        pricelistMap[item.id] = { price: base, base, appliedItemId: null, rule: 'fallback_lst_price' };
+      }
+    }
+
     const catalogItems = ptItems.map((item: any) => {
       const categId = item.categ_id?.[0] || 0;
       const categPath = categPathMap[categId] || item.categ_id?.[1] || '';
       const classification = classifyProduct(categPath);
+      const resolved = pricelistMap[item.id];
+      const finalPrice = resolved ? resolved.price : (item.lst_price || item.list_price || 0);
 
       return {
         id: item.id,
         name: item.name,
         sku: item.default_code || null,
-        price: Math.round((item.lst_price || item.list_price || 0) * 100) / 100,
+        price: Math.round(finalPrice * 100) / 100,
+        // base/list_price informativo — útil para mostrar tachado si hay descuento
+        list_price: Math.round((item.lst_price || item.list_price || 0) * 100) / 100,
+        pricing_rule: resolved?.rule || 'list_price',
         uom: item.uom_id ? item.uom_id[1] : 'pza',
         boxSize: packagingMap[item.id] || 1,
         stock: item.qty_available,
@@ -114,6 +140,12 @@ export async function GET() {
         subgroup_label: classification.subgroup_label,
         sort_order: classification.sort_order,
       };
+    });
+
+    console.info('[B2B_PRICING] catalog resolved', {
+      partner_id: payload.partner_id,
+      products: catalogItems.length,
+      pricelist_rules_applied: catalogItems.filter((c: any) => c.pricing_rule !== 'list_price' && c.pricing_rule !== 'no_pricelist' && c.pricing_rule !== 'fallback_lst_price').length,
     });
 
     // Extraer peso en KG del nombre para ordenar productos por tamaño

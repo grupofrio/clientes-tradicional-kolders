@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { callKw } from '@/lib/odoo';
 import { verifyToken } from '@/lib/auth';
+import { resolvePricesForPartner } from '@/lib/pricelist';
 import { cookies } from 'next/headers';
 
 export async function POST(request: Request) {
@@ -31,6 +32,20 @@ export async function POST(request: Request) {
       productMap[p.id] = p;
     }
 
+    // ── P0 FIX: revalidar precios usando pricelist del partner ──
+    // El catálogo ya usa pricelist; aquí re-validamos por si el item cambió
+    // entre catálogo y checkout (race con cambio de pricelist en Odoo).
+    let pricelistMap: Record<number, { price: number; base: number; appliedItemId: number | null; rule: string }> = {};
+    try {
+      pricelistMap = await resolvePricesForPartner(Number(payload.partner_id), productIds);
+    } catch (priceErr) {
+      console.warn('[B2B_PRICING] cart-validate resolver failed', priceErr);
+      for (const p of products) {
+        const base = p.lst_price || p.list_price || 0;
+        pricelistMap[p.id] = { price: base, base, appliedItemId: null, rule: 'fallback_lst_price' };
+      }
+    }
+
     const issues: any[] = [];
     const validated_lines: any[] = [];
 
@@ -47,7 +62,8 @@ export async function POST(request: Request) {
         continue;
       }
 
-      const serverPrice = product.lst_price || product.list_price || 0;
+      const resolved = pricelistMap[line.product_id];
+      const serverPrice = resolved ? resolved.price : (product.lst_price || product.list_price || 0);
       const priceDiff = Math.abs(serverPrice - line.price);
       const priceChanged = priceDiff > 0.01;
 
