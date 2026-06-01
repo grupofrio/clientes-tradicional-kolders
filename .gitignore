@@ -39,3 +39,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Local validation script (not for prod)
+test_pricelist_module.mjs
+.claude/
