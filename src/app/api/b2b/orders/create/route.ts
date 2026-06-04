@@ -117,20 +117,23 @@ export async function POST(request: Request) {
         })();
 
     // ── Idempotencia (robusta) ─────────────────────────────────────────────
-    // x_kold_idempotency_key tiene un UNIQUE constraint GLOBAL en Odoo. Por eso:
-    //   • Buscamos por la key SOLA (sin filtrar partner) y en el contexto de
-    //     compañía del partner — el pre-check anterior filtraba por partner y sin
-    //     contexto de compañía, así que no veía el pedido de la cía 34 y el create
-    //     chocaba contra el constraint → 502.
+    // x_kold_idempotency_key tiene un UNIQUE constraint GLOBAL en Odoo. La key se
+    // deriva de forma determinística (partner+fecha+pago+líneas), así que un doble
+    // submit del mismo carrito produce la MISMA key → si dos requests corren en
+    // paralelo, el pre-check de ambos no ve nada, ambos crean, y el segundo choca
+    // contra el constraint → 502. Esa carrera es la causa real del 502 observado.
+    //
+    //   • Buscamos por la key SOLA (sin filtrar partner y SIN estrechar compañía:
+    //     la sesión de servicio ya ve todas las compañías, igual que el constraint
+    //     global). El pre-check anterior filtraba por partner, lo que dejaba pasar
+    //     colisiones de keys enviadas por el cliente entre partners distintos.
     //   • Si existe y es del mismo partner → replay (200, idempotent_replay).
     //   • Si existe pero es de OTRO partner → conflicto controlado (409), sin crear.
-    const idemCompanyId = partner.company_id ? partner.company_id[0] : parseInt(process.env.ODOO_COMPANY_ID || '34');
-    const idemCtx = { context: { allowed_company_ids: [idemCompanyId] } };
     const isIdempotencyError = (e: any) => /idempotenc|llave de idempotencia/i.test(e?.message || '');
     const lookupIdempotent = async () => {
       const rows = await callKw('sale.order', 'search_read',
         [[['x_kold_idempotency_key', '=', idempotencyKey]]],
-        { fields: ['id', 'name', 'state', 'amount_total', 'partner_id'], limit: 1, ...idemCtx });
+        { fields: ['id', 'name', 'state', 'amount_total', 'partner_id'], limit: 1 });
       return rows && rows.length ? rows[0] : null;
     };
     const idempotentReplay = (ex: any, phase: string) => {
