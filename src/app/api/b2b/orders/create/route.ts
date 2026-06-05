@@ -116,28 +116,54 @@ export async function POST(request: Request) {
           return 'b2b-' + createHash('sha1').update(fingerprint).digest('hex').substring(0, 24);
         })();
 
-    // Buscar pedido existente con este idempotency_key (last 7 días)
-    const existingOrders = await callKw('sale.order', 'search_read', [[
-      ['x_kold_idempotency_key', '=', idempotencyKey],
-      ['partner_id', '=', partnerId],
-    ]], {
-      fields: ['id', 'name', 'state', 'amount_total'],
-      limit: 1,
-    });
-    if (existingOrders && existingOrders.length > 0) {
-      const existing = existingOrders[0];
-      console.info('[B2B_ORDER] idempotent return', { partner_id: partnerId, order_id: existing.id, key_prefix: idempotencyKey.substring(0, 12) });
+    // ── Idempotencia (robusta) ─────────────────────────────────────────────
+    // x_kold_idempotency_key tiene un UNIQUE constraint GLOBAL en Odoo. La key se
+    // deriva de forma determinística (partner+fecha+pago+líneas), así que un doble
+    // submit del mismo carrito produce la MISMA key → si dos requests corren en
+    // paralelo, el pre-check de ambos no ve nada, ambos crean, y el segundo choca
+    // contra el constraint → 502. Esa carrera es la causa real del 502 observado.
+    //
+    //   • Buscamos por la key SOLA (sin filtrar partner y SIN estrechar compañía:
+    //     la sesión de servicio ya ve todas las compañías, igual que el constraint
+    //     global). El pre-check anterior filtraba por partner, lo que dejaba pasar
+    //     colisiones de keys enviadas por el cliente entre partners distintos.
+    //   • Si existe y es del mismo partner → replay (200, idempotent_replay).
+    //   • Si existe pero es de OTRO partner → conflicto controlado (409), sin crear.
+    const isIdempotencyError = (e: any) => /idempotenc|llave de idempotencia/i.test(e?.message || '');
+    const lookupIdempotent = async () => {
+      const rows = await callKw('sale.order', 'search_read',
+        [[['x_kold_idempotency_key', '=', idempotencyKey]]],
+        { fields: ['id', 'name', 'state', 'amount_total', 'partner_id'], limit: 1 });
+      return rows && rows.length ? rows[0] : null;
+    };
+    const idempotentReplay = (ex: any, phase: string) => {
+      console.info(`[B2B_IDEMPOTENCY] ${phase}`, { partner_id: partnerId, order_id: ex.id, order_name: ex.name });
       return NextResponse.json({
-        order_id: existing.id,
-        order_name: existing.name,
-        status: existing.state === 'sale' ? 'confirmed' : 'draft',
-        total_con_iva: existing.amount_total,
+        idempotent_replay: true,
+        order_id: ex.id,
+        order_name: ex.name,
+        state: ex.state,
+        status: ex.state === 'sale' ? 'confirmed' : 'draft',
+        total_con_iva: ex.amount_total,
+        amount_total: ex.amount_total,
         credito_disponible: partner.credit_limit - partner.credit,
-        supera_credito: existing.amount_total > (partner.credit_limit - partner.credit),
+        supera_credito: ex.amount_total > (partner.credit_limit - partner.credit),
         ejecutivo_nombre: partner.user_id ? partner.user_id[1] : 'Ejecutivo no asignado',
         ejecutivo_id: partner.user_id ? partner.user_id[0] : null,
-        idempotent: true,
       });
+    };
+    const idempotentCollision = () => {
+      // No exponer datos del otro pedido/partner.
+      console.warn('[B2B_IDEMPOTENCY] collision different partner', { partner_id: partnerId, key_prefix: idempotencyKey.substring(0, 12) });
+      return NextResponse.json({ error: 'No se pudo procesar el pedido por un conflicto de referencia. Vuelve a generar el carrito e intenta de nuevo.' }, { status: 409 });
+    };
+
+    const preexisting = await lookupIdempotent();
+    if (preexisting) {
+      console.info('[B2B_IDEMPOTENCY] precheck found existing order', { partner_id: partnerId, order_id: preexisting.id });
+      const exPartner = preexisting.partner_id ? preexisting.partner_id[0] : null;
+      if (exPartner && exPartner !== partnerId) return idempotentCollision();
+      return idempotentReplay(preexisting, 'replay returned');
     }
 
     // ── 3. Pricing: resolver precios desde pricelist del partner ───────────
@@ -319,21 +345,40 @@ export async function POST(request: Request) {
     // Idempotency key — campo Studio existente (x_kold_idempotency_key)
     baseOrder.x_kold_idempotency_key = idempotencyKey;
 
+    // createOrder: intenta con campos x_studio_*; si Odoo NO los acepta, reintenta
+    // SIN ellos. PERO si el error es de idempotencia (unique constraint), NO reintenta:
+    // ese fallback solo repetiría el mismo error. Se maneja como replay más abajo.
+    const createOrder = async (order: Record<string, any>): Promise<number> => {
+      try {
+        return await callKw('sale.order', 'create', [{
+          ...order,
+          x_studio_canal_origen: 'pwa_canal_tradicional',
+          x_studio_horario_de_entrega_solicitado: delivery_schedule || '',
+        }], companyContext);
+      } catch (studioError: any) {
+        if (isIdempotencyError(studioError)) throw studioError;
+        console.warn('[B2B_ORDER] sale.order create sin campos x_studio_*:', studioError?.message || studioError);
+        return await callKw('sale.order', 'create', [order], companyContext);
+      }
+    };
+
     let orderId: number;
     try {
-      orderId = await callKw('sale.order', 'create', [{
-        ...baseOrder,
-        x_studio_canal_origen: 'pwa_canal_tradicional',
-        x_studio_horario_de_entrega_solicitado: delivery_schedule || '',
-      }], companyContext);
-    } catch (studioError: any) {
-      console.warn('[B2B_ORDER] sale.order create sin campos x_studio_*:', studioError?.message || studioError);
-      try {
-        orderId = await callKw('sale.order', 'create', [baseOrder], companyContext);
-      } catch (createError: any) {
-        console.error('[B2B_ORDER] sale.order create FAILED', { partner_id: partnerId, err: createError?.message });
-        return NextResponse.json({ error: 'No se pudo crear la orden en Odoo. Intenta nuevamente.' }, { status: 502 });
+      orderId = await createOrder(baseOrder);
+    } catch (createError: any) {
+      // Carrera: la key se insertó entre el pre-check y el create (o el pre-check no la
+      // vio). Re-buscamos por la key; si ya existe la devolvemos como replay — no es un
+      // error real. Solo si NO aparece reportamos error (controlado, nunca 500/502 mudo).
+      if (isIdempotencyError(createError)) {
+        const raced = await lookupIdempotent();
+        if (raced) {
+          const exPartner = raced.partner_id ? raced.partner_id[0] : null;
+          if (exPartner && exPartner !== partnerId) return idempotentCollision();
+          return idempotentReplay(raced, 'race recovered');
+        }
       }
+      console.error('[B2B_ORDER] sale.order create FAILED', { partner_id: partnerId, err: createError?.message });
+      return NextResponse.json({ error: 'No se pudo crear la orden en Odoo. Intenta nuevamente.' }, { status: 502 });
     }
 
     // ── 8. Re-lee la orden y sus líneas para confirmar lo que persistió ──
