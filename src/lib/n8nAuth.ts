@@ -42,7 +42,7 @@ export function normalizeMxPhone(phone: string): string {
 }
 
 export function getN8nAuthConfig(env: EnvLike = process.env): N8nAuthConfig {
-  const channel = env.NEXT_PUBLIC_CANAL_ORIGEN || "pwa_canal_tradicional";
+  const channel = env.NEXT_PUBLIC_CANAL_ORIGEN || "gf";
   const baseUrl = env.N8N_AUTH_BASE_URL || env.N8N_WEBHOOK_AUTH_BASE_URL;
   const requestUrl = env.N8N_AUTH_REQUEST_URL || (baseUrl ? joinUrl(baseUrl, "pwa-auth-request") : "");
   const verifyUrl = env.N8N_AUTH_VERIFY_URL || (baseUrl ? joinUrl(baseUrl, "pwa-auth-verify") : "");

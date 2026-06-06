@@ -1,39 +1,8 @@
 "use client";
-import { useState } from "react";
-import { Loader2 } from "lucide-react";
+
+const WA_LINK = "https://wa.me/521554000990?text=Dame%20mi%20acceso";
 
 export default function Home() {
-  const [phone, setPhone] = useState("");
-  const [otp, setOtp] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [success, setSuccess] = useState(false);
-  const [errorMsg, setErrorMsg] = useState("");
-
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (phone.length < 10) return;
-
-    setLoading(true);
-    setErrorMsg("");
-    try {
-      const res = await fetch("/api/auth/request-link", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone })
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setErrorMsg(data.error);
-      } else {
-        setSuccess(true);
-      }
-    } catch (err) {
-      setErrorMsg("Error de conexión al servidor");
-    } finally {
-      setLoading(false);
-    }
-  };
-
   return (
     <main className="min-h-screen bg-background flex flex-col relative px-6 py-12">
       <div className="flex-1 flex flex-col justify-center max-w-sm mx-auto w-full z-10">
@@ -44,117 +13,33 @@ export default function Home() {
             KOLDOS
           </h1>
           <p className="text-muted-foreground mt-2 text-sm">
-            Ingresa tu número de contacto B2B para entrar al catálogo.
+            Recibe tu enlace de acceso B2B directo en WhatsApp.
           </p>
         </div>
 
-        {success ? (
-          <div className="bg-success/10 border border-success/20 rounded-2xl p-6 text-center animate-in fade-in slide-in-from-bottom-4">
-            <div className="w-16 h-16 bg-success/20 rounded-full flex items-center justify-center mx-auto mb-4 text-success text-2xl">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
-            </div>
-            <h3 className="font-bold text-lg mb-2 text-foreground">Ingresa tu código</h3>
-            <p className="text-sm text-muted-foreground mb-6">
-              Enviamos un código de 6 dígitos al <b>{phone}</b>
-            </p>
+        <div className="space-y-6">
+          <a
+            href={WA_LINK}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-full h-14 rounded-xl bg-primary text-white font-bold tracking-wide transition-all hover:bg-primary/90 flex items-center justify-center gap-2 shadow-lg shadow-primary/20"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+            </svg>
+            Recibir Enlace KOLD
+          </a>
 
-            <form onSubmit={async (e) => {
-              e.preventDefault();
-              if (otp.length !== 6) return;
-              setLoading(true);
-              setErrorMsg("");
-              try {
-                const res = await fetch("/api/auth/verify-code", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ code: otp, phone })
-                });
-                const data = await res.json();
-                if (!res.ok) {
-                  setErrorMsg(data.error);
-                } else {
-                  window.location.href = data.redirect || '/';
-                }
-              } catch (err) {
-                setErrorMsg("Error al verificar código");
-              } finally {
-                setLoading(false);
-              }
-            }} className="space-y-4">
-              <input
-                type="text"
-                value={otp}
-                onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').substring(0, 6))}
-                placeholder="000000"
-                className="w-full h-16 text-center text-3xl tracking-[0.5em] font-bold bg-card border-none rounded-xl outline-none ring-1 ring-border focus:ring-2 focus:ring-primary shadow-sm"
-                autoFocus
-                maxLength={6}
-              />
+          <p className="text-center text-xs text-muted-foreground">
+            Se abrirá WhatsApp con un mensaje listo para enviar.
+            El bot te entregará tu enlace de acceso en segundos.
+          </p>
+        </div>
 
-              {errorMsg && (
-                <div className="p-3 rounded-lg bg-danger/10 text-danger text-sm font-medium animate-in fade-in">
-                  {errorMsg}
-                </div>
-              )}
-
-              <button
-                type="submit"
-                disabled={otp.length !== 6 || loading}
-                className="w-full h-14 rounded-xl bg-primary text-white font-bold tracking-wide transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:bg-primary/90 flex items-center justify-center gap-2 shadow-lg shadow-primary/20"
-              >
-                {loading ? <Loader2 className="animate-spin" /> : "Verificar e Ingresar"}
-              </button>
-            </form>
-
-            <button
-              onClick={() => { setSuccess(false); setOtp(""); setErrorMsg(""); }}
-              className="mt-6 text-primary text-sm font-bold opacity-80 hover:opacity-100"
-            >
-              Cambiar número
-            </button>
-          </div>
-        ) : (
-          <form onSubmit={handleLogin} className="space-y-6">
-            <div className="space-y-2">
-              <label className="text-sm font-bold text-foreground">
-                Número de Celular B2B
-              </label>
-              <div className="relative">
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-bold">
-                  +52
-                </span>
-                <input
-                  type="tel"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').substring(0, 10))}
-                  placeholder="Tu celular a 10 dígitos"
-                  className="w-full h-14 bg-card border-none rounded-xl pl-14 pr-4 text-lg font-bold outline-none ring-1 ring-border focus:ring-2 focus:ring-primary shadow-sm"
-                  autoFocus
-                />
-              </div>
-            </div>
-
-            {errorMsg && (
-              <div className="p-3 rounded-lg bg-danger/10 text-danger text-sm font-medium animate-in fade-in">
-                {errorMsg}
-              </div>
-            )}
-
-            <button
-              type="submit"
-              disabled={phone.length < 10 || loading}
-              className="w-full h-14 rounded-xl bg-primary text-white font-bold tracking-wide transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:bg-primary/90 flex items-center justify-center gap-2 shadow-lg shadow-primary/20"
-            >
-              {loading ? <Loader2 className="animate-spin" /> : "Recibir Enlace KOLD"}
-            </button>
-          </form>
-        )}
       </div>
 
-      {/* Decorative background B2B styling */}
       <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl -z-10 translate-x-1/2 -translate-y-1/2"></div>
       <div className="absolute bottom-0 left-0 w-64 h-64 bg-accent/5 rounded-full blur-3xl -z-10 -translate-x-1/2 translate-y-1/2"></div>
-
     </main>
   );
 }
