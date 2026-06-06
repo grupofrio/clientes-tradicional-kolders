@@ -54,90 +54,108 @@ export default function InvoicesPage() {
 
   return (
     <div className="min-h-screen bg-background pb-32">
-        <div className="bg-white border-b border-border p-4 sticky top-0 z-20 shadow-sm flex items-center gap-3">
-            <button onClick={() => router.push('/account')} className="w-10 h-10 flex items-center justify-center bg-muted text-foreground rounded-full hover:bg-muted/80 transition-colors">
-                <ArrowLeft size={20} />
-            </button>
-            <h1 className="text-xl font-bold text-foreground font-display">Facturación y Pagos</h1>
+      {/* Header */}
+      <div className="bg-gradient-to-br from-[#1E3A8A] to-[#2563EB] pt-10 pb-4 px-4 shadow-lg">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => router.push('/account')}
+            className="w-9 h-9 flex items-center justify-center bg-white/15 text-white rounded-xl"
+          >
+            <ArrowLeft size={18} />
+          </button>
+          <h1 className="text-white text-lg font-black">Facturación y Pagos</h1>
         </div>
+      </div>
 
-        <div className="p-4 space-y-4 relative z-10">
-           {/* Estado general consolidado */}
-           {!loading && invoices.length > 0 && (
-             <div className={`p-5 rounded-2xl border shadow-sm ${hasVencidas ? 'bg-danger/5 border-danger/30' : 'bg-white border-border'}`}>
-                 <p className="text-xs uppercase font-bold text-muted-foreground mb-1 tracking-wider">Deuda Total Pendiente</p>
-                 <p className={`text-4xl font-extrabold tracking-tight ${hasVencidas ? 'text-danger' : 'text-foreground'}`}>
-                     ${totalDeuda.toLocaleString('en-US', {minimumFractionDigits: 2})}
-                 </p>
-                 {hasVencidas && <p className="text-danger flex items-center gap-1 text-xs font-bold mt-2"><AlertCircle size={14} /> Tienes facturas vencidas bloqueando crédito</p>}
-             </div>
-           )}
+      <div className="p-4 space-y-3 relative z-10">
+        {/* Total debt summary */}
+        {!loading && invoices.length > 0 && (
+          <div className={`p-5 rounded-2xl border shadow-sm ${hasVencidas ? 'bg-danger/5 border-danger/30' : 'bg-card border-border'}`}>
+            <p className="text-[9px] uppercase font-black text-muted-foreground mb-1 tracking-wider">Deuda Total Pendiente</p>
+            <p className={`text-4xl font-black tracking-tight ${hasVencidas ? 'text-danger' : 'text-foreground'}`}>
+              ${totalDeuda.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+            </p>
+            {hasVencidas && (
+              <p className="text-danger flex items-center gap-1 text-xs font-bold mt-2">
+                <AlertCircle size={13} /> Tienes facturas vencidas bloqueando crédito
+              </p>
+            )}
+          </div>
+        )}
 
-           {loading ? (
-              <div className="flex justify-center p-10"><Loader2 className="animate-spin text-primary w-8 h-8" /></div>
-           ) : invoices.length === 0 ? (
-              <div className="text-center p-10 bg-white border border-border rounded-xl">
-                 <CheckCircle2 size={40} className="text-success mx-auto mb-3" />
-                 <h3 className="font-bold text-foreground">Tu cuenta está al corriente</h3>
-                 <p className="text-muted-foreground text-sm">No tienes facturas comerciales pendientes de pago.</p>
-              </div>
-           ) : (
-             <div className="space-y-4">
-               {invoices.map(inv => {
-                  const status = getStatusInfo(inv.invoice_date_due);
-                  return (
-                    <div key={inv.id} className="bg-white border border-border rounded-xl shadow-sm overflow-hidden flex flex-col">
-                       <div className="p-4 flex justify-between items-start">
-                           <div>
-                               <h3 className="font-extrabold text-foreground text-lg mb-1">{inv.name}</h3>
-                               <div className="flex items-center gap-2 mb-2">
-                                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${status.color}`}>
-                                    {status.icon} {status.label}
-                                  </span>
-                                  <span className="text-[10px] text-muted-foreground font-medium">Emitida: {new Date(inv.invoice_date).toLocaleDateString()}</span>
-                               </div>
-                           </div>
-                           <div className="text-right">
-                               <p className="text-xs text-muted-foreground uppercase font-bold mb-0.5">Pendiente</p>
-                               <p className="font-extrabold text-xl text-foreground">${inv.amount_residual.toLocaleString('en-US', {minimumFractionDigits: 2})}</p>
-                           </div>
-                       </div>
-                       
-                       <div className="bg-muted/10 p-3 pt-4 border-t border-border flex gap-3">
-                           <button
-                             disabled={downloadingPdf === inv.id}
-                             onClick={async () => {
-                               setDownloadingPdf(inv.id);
-                               try {
-                                 const res = await fetch(`/api/b2b/invoices/${inv.id}/pdf`);
-                                 if (!res.ok) throw new Error('PDF no disponible');
-                                 const blob = await res.blob();
-                                 const url = URL.createObjectURL(blob);
-                                 window.open(url, '_blank');
-                                 setTimeout(() => URL.revokeObjectURL(url), 60000);
-                               } catch (e) {
-                                 alert('No se pudo obtener el PDF. Intenta más tarde.');
-                               } finally {
-                                 setDownloadingPdf(null);
-                               }
-                             }}
-                             className="flex-1 bg-white border border-border text-foreground text-xs font-bold py-2.5 rounded-lg flex items-center justify-center gap-2 hover:bg-muted/50 transition-colors disabled:opacity-50"
-                           >
-                               {downloadingPdf === inv.id ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />} Ver PDF
-                           </button>
-                           <button onClick={() => setShowPaymentModal(inv)} className="flex-1 bg-primary text-white text-xs font-bold py-2.5 rounded-lg shadow-md hover:bg-primary/90 transition-colors">
-                               Abonar / Pagar
-                           </button>
-                       </div>
+        {loading ? (
+          <div className="flex justify-center p-10">
+            <Loader2 className="animate-spin text-primary w-8 h-8" />
+          </div>
+        ) : invoices.length === 0 ? (
+          <div className="text-center p-10 bg-card border border-border rounded-2xl">
+            <CheckCircle2 size={40} className="text-success mx-auto mb-3" />
+            <h3 className="font-black text-foreground mb-1">Al corriente</h3>
+            <p className="text-muted-foreground text-sm">No tienes facturas pendientes de pago.</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {invoices.map(inv => {
+              const status = getStatusInfo(inv.invoice_date_due);
+              return (
+                <div key={inv.id} className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
+                  <div className="p-4 flex justify-between items-start">
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-black text-foreground text-base mb-1">{inv.name}</h3>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${status.color}`}>
+                          {status.icon} {status.label}
+                        </span>
+                        <span className="text-[10px] text-muted-foreground">
+                          Emitida: {new Date(inv.invoice_date).toLocaleDateString()}
+                        </span>
+                      </div>
                     </div>
-                  );
-               })}
-             </div>
-           )}
-        </div>
+                    <div className="text-right ml-3">
+                      <p className="text-[9px] text-muted-foreground uppercase font-bold mb-0.5">Pendiente</p>
+                      <p className="font-black text-xl text-foreground">
+                        ${inv.amount_residual.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="p-3 border-t border-border flex gap-2">
+                    <button
+                      disabled={downloadingPdf === inv.id}
+                      onClick={async () => {
+                        setDownloadingPdf(inv.id);
+                        try {
+                          const res = await fetch(`/api/b2b/invoices/${inv.id}/pdf`);
+                          if (!res.ok) throw new Error('PDF no disponible');
+                          const blob = await res.blob();
+                          const url = URL.createObjectURL(blob);
+                          window.open(url, '_blank');
+                          setTimeout(() => URL.revokeObjectURL(url), 60000);
+                        } catch {
+                          alert('No se pudo obtener el PDF. Intenta más tarde.');
+                        } finally {
+                          setDownloadingPdf(null);
+                        }
+                      }}
+                      className="flex-1 bg-secondary border border-border text-foreground text-xs font-bold py-2.5 rounded-xl flex items-center justify-center gap-1.5 disabled:opacity-50"
+                    >
+                      {downloadingPdf === inv.id ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />} Ver PDF
+                    </button>
+                    <button
+                      onClick={() => setShowPaymentModal(inv)}
+                      className="flex-1 bg-primary text-white text-xs font-bold py-2.5 rounded-xl shadow-md flex items-center justify-center"
+                    >
+                      Abonar / Pagar
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
 
-        {/* Modal Pago */}
-        {showPaymentModal && (
+      {/* Modal Pago */}
+      {showPaymentModal && (
             <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-4">
                 <div className="bg-white w-full max-w-sm rounded-[2rem] p-6 shadow-2xl relative animate-in slide-in-from-bottom-10">
                     <button onClick={() => setShowPaymentModal(null)} className="absolute top-4 right-5 text-muted-foreground hover:text-foreground font-bold">X</button>
