@@ -16,12 +16,12 @@ export default function BottomNav() {
     fetch('/api/b2b/invoices')
       .then(res => res.json())
       .then(data => {
-         if(!data.error && Array.isArray(data)) {
-             setHasDebt(data.some((inv: any) => new Date(inv.invoice_date_due) < new Date()));
-         }
+        if (!data.error && Array.isArray(data)) {
+          setHasDebt(data.some((inv: any) => new Date(inv.invoice_date_due) < new Date()));
+        }
       })
       .catch(() => {});
-  }, [pathname]); // Refresh en cambio de ruta 
+  }, [pathname]);
 
   const navItems = [
     { name: "Catálogo", href: "/catalog", icon: Package },
@@ -31,7 +31,7 @@ export default function BottomNav() {
   ];
 
   return (
-    <div className="fixed bottom-0 left-0 w-full bg-card border-t border-border px-6 py-3 pb-8 z-50 flex justify-between shadow-2xl">
+    <div className="fixed bottom-0 left-0 w-full bg-card border-t border-border px-6 py-2 pb-7 z-50 flex justify-between shadow-2xl">
       {navItems.map((item) => {
         const Icon = item.icon;
         const isActive = pathname.startsWith(item.href);
@@ -41,23 +41,24 @@ export default function BottomNav() {
             key={item.name}
             href={item.href}
             className={`flex flex-col items-center gap-1 relative transition-colors ${
-              isActive ? "text-primary scale-110" : "text-muted-foreground hover:text-foreground"
+              isActive ? "text-primary" : "text-muted-foreground hover:text-foreground"
             }`}
           >
             <div className="relative">
-              <Icon size={24} strokeWidth={isActive ? 2.5 : 2} />
+              <Icon size={22} strokeWidth={isActive ? 2.5 : 1.8} />
               {item.badge !== undefined && item.badge > 0 && (
-                <span className="absolute -top-2 -right-3 bg-danger text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center shadow-md">
+                <span className="absolute -top-2 -right-3 bg-danger text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center shadow-md">
                   {item.badge}
                 </span>
               )}
               {item.showDot && (
-                 <span className="absolute -top-1 right-0 w-3 h-3 bg-danger rounded-full border-2 border-white shadow-sm"></span>
+                <span className="absolute -top-1 right-0 w-2.5 h-2.5 bg-danger rounded-full border-2 border-white shadow-sm" />
               )}
             </div>
-            <span className={`text-[10px] font-medium tracking-wide ${isActive ? "font-bold" : ""}`}>
+            <span className={`text-[9px] tracking-wide ${isActive ? "font-bold text-primary" : "font-medium"}`}>
               {item.name}
             </span>
+            {isActive && <span className="w-1 h-1 bg-primary rounded-full" />}
           </Link>
         );
       })}
