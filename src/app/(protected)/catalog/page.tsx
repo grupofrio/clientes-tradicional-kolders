@@ -2,6 +2,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { useB2BCartStore } from "@/store/cart";
 import { Search, Loader2, AlertCircle, ChevronDown, ShoppingCart, Snowflake, Package } from "lucide-react";
+import Link from "next/link";
 
 interface CatalogItem {
   id: number;
@@ -28,16 +29,13 @@ export default function Catalog() {
   const [search, setSearch] = useState("");
   const [activeFamily, setActiveFamily] = useState<string>("ALL");
   const [collapsedSubgroups, setCollapsedSubgroups] = useState<Set<string>>(new Set());
-  // Ids de productos cuya <img> falló al cargar -> mostrar placeholder por categoría.
   const [brokenImg, setBrokenImg] = useState<Set<number>>(new Set());
-
   const [partner, setPartner] = useState<any>(null);
 
   const cartItems = useB2BCartStore(state => state.items);
   const addItem = useB2BCartStore(state => state.addItem);
   const setQty = useB2BCartStore(state => state.setQty);
 
-  // Cargar catálogo una sola vez
   useEffect(() => {
     fetch('/api/account/profile')
       .then(res => res.json())
@@ -52,7 +50,6 @@ export default function Catalog() {
       .then(data => {
         if (Array.isArray(data)) {
           setItems(data);
-          // Default: LAURITA para Canal Tradicional (si tiene productos)
           const hasLaurita = data.some((d: CatalogItem) => d.family_key === 'LAURITA');
           setActiveFamily(hasLaurita ? 'LAURITA' : 'ALL');
         } else {
@@ -67,7 +64,6 @@ export default function Catalog() {
       });
   }, []);
 
-  // Familias disponibles (derivadas de los datos)
   const families = useMemo(() => {
     const familyMap = new Map<string, { key: string; label: string; count: number; minOrder: number }>();
     items.forEach(item => {
@@ -82,26 +78,18 @@ export default function Catalog() {
     return Array.from(familyMap.values()).sort((a, b) => a.minOrder - b.minOrder);
   }, [items]);
 
-  // Filtrar por búsqueda y familia activa
   const filteredItems = useMemo(() => {
     let filtered = items;
-
-    if (activeFamily !== 'ALL') {
-      filtered = filtered.filter(item => item.family_key === activeFamily);
-    }
-
+    if (activeFamily !== 'ALL') filtered = filtered.filter(item => item.family_key === activeFamily);
     if (search.trim()) {
       const q = search.toLowerCase();
       filtered = filtered.filter(item =>
-        item.name.toLowerCase().includes(q) ||
-        (item.sku && item.sku.toLowerCase().includes(q))
+        item.name.toLowerCase().includes(q) || (item.sku && item.sku.toLowerCase().includes(q))
       );
     }
-
     return filtered;
   }, [items, activeFamily, search]);
 
-  // Agrupar por subgrupo
   const groupedItems = useMemo(() => {
     const groups = new Map<string, { key: string; label: string; items: CatalogItem[]; minOrder: number }>();
     filteredItems.forEach(item => {
@@ -125,71 +113,78 @@ export default function Catalog() {
     });
   };
 
-  const handleQtyChange = (product_id: number, e: any, itemConfig: CatalogItem) => {
-    const rawQty = parseInt(e.target.value) || 0;
-    const cartExists = cartItems.find(i => i.product_id === product_id);
+  const getCartQty = (id: number): number => {
+    const item = cartItems.find(i => i.product_id === id);
+    return item ? item.qty : 0;
+  };
 
-    if (rawQty === 0 && cartExists) {
-      useB2BCartStore.getState().removeItem(product_id);
-    } else if (rawQty > 0) {
-      if (!cartExists) {
-        addItem({
-          product_id: itemConfig.id,
-          name: itemConfig.name,
-          sku: itemConfig.sku || "",
-          price: itemConfig.price,
-          tax_rate: itemConfig.tax_rate || 0,
-          uom_name: itemConfig.uom,
-          qty: rawQty,
-          qtyPerPage: itemConfig.boxSize
-        });
-      } else {
-        setQty(product_id, rawQty);
-      }
+  const handleIncrement = (item: CatalogItem) => {
+    const currentQty = getCartQty(item.id);
+    const newQty = currentQty + 1;
+    if (currentQty === 0) {
+      addItem({
+        product_id: item.id,
+        name: item.name,
+        sku: item.sku || "",
+        price: item.price,
+        tax_rate: item.tax_rate || 0,
+        uom_name: item.uom,
+        qty: 1,
+        qtyPerPage: item.boxSize,
+      });
+    } else {
+      setQty(item.id, newQty);
     }
   };
 
-  const getCartQty = (id: number): string => {
-    const item = cartItems.find(i => i.product_id === id);
-    return item ? String(item.qty) : "";
+  const handleDecrement = (item: CatalogItem) => {
+    const currentQty = getCartQty(item.id);
+    if (currentQty <= 1) {
+      useB2BCartStore.getState().removeItem(item.id);
+    } else {
+      setQty(item.id, currentQty - 1);
+    }
   };
 
   const totalCartItems = cartItems.reduce((sum, i) => sum + i.qty, 0);
+  const totalCartValue = cartItems.reduce((sum, i) => sum + i.price * i.qty, 0);
 
   return (
-    <div className="min-h-screen bg-background pb-96">
+    <div className="min-h-screen bg-background pb-36">
       {/* Header */}
-      <div className="bg-primary pt-10 pb-5 px-4 text-white shadow-md">
-        <div className="flex justify-between items-center mb-3">
+      <div className="bg-gradient-to-br from-[#1E3A8A] to-[#2563EB] pt-10 pb-4 px-4 shadow-lg">
+        <div className="flex justify-between items-start mb-3">
           <div className="min-w-0 flex-1">
-            <h1 className="text-lg font-bold font-display truncate">{partner?.name || 'Cargando...'}</h1>
+            <p className="text-white/60 text-[9px] font-bold tracking-[0.15em] uppercase mb-0.5">Portal Distribuidores · KOLDOS</p>
+            <h1 className="text-white text-lg font-black tracking-tight truncate">{partner?.name || 'Cargando...'}</h1>
           </div>
-          <div className="text-right flex-shrink-0 ml-3">
-            <p className="text-[10px] text-blue-200 uppercase font-bold tracking-wider">Disponible</p>
-            <p className="font-extrabold text-lg">
+          <div className="bg-white/12 rounded-xl px-3 py-2 text-right flex-shrink-0 ml-3">
+            <p className="text-white/60 text-[8px] font-bold tracking-widest uppercase">Disponible</p>
+            <p className="text-white font-extrabold text-base">
               ${(partner ? (partner.credit_limit - partner.credit_used) : 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
             </p>
           </div>
         </div>
-
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-white/50 w-4 h-4" />
           <input
             type="text"
             placeholder="Buscar producto o SKU..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full h-10 bg-white rounded-lg pl-10 pr-4 text-sm text-foreground outline-none border-none focus:ring-2 focus:ring-accent"
+            className="w-full h-10 bg-white/15 rounded-xl pl-9 pr-4 text-sm text-white placeholder:text-white/40 outline-none focus:bg-white/20 transition-colors"
           />
         </div>
       </div>
 
-      {/* Familia tabs — sticky */}
-      <div className="px-2 py-2.5 border-b border-border bg-white sticky top-0 z-20 flex gap-1.5 overflow-x-auto no-scrollbar">
+      {/* Family tabs */}
+      <div className="px-3 py-2.5 border-b border-border bg-card sticky top-0 z-20 flex gap-2 overflow-x-auto no-scrollbar">
         <button
           onClick={() => setActiveFamily('ALL')}
-          className={`flex-shrink-0 px-4 py-1.5 rounded-full text-xs font-bold transition-colors ${
-            activeFamily === 'ALL' ? 'bg-primary text-white' : 'bg-secondary text-muted-foreground'
+          className={`flex-shrink-0 px-4 py-1.5 rounded-full text-xs font-bold transition-all ${
+            activeFamily === 'ALL'
+              ? 'bg-primary text-white shadow-md shadow-primary/30'
+              : 'bg-secondary text-muted-foreground border border-border'
           }`}
         >
           Todas
@@ -198,24 +193,24 @@ export default function Catalog() {
           <button
             key={f.key}
             onClick={() => setActiveFamily(f.key)}
-            className={`flex-shrink-0 px-4 py-1.5 rounded-full text-xs font-bold transition-colors ${
-              activeFamily === f.key ? 'bg-primary text-white' : 'bg-secondary text-muted-foreground'
+            className={`flex-shrink-0 px-4 py-1.5 rounded-full text-xs font-bold transition-all ${
+              activeFamily === f.key
+                ? 'bg-primary text-white shadow-md shadow-primary/30'
+                : 'bg-secondary text-muted-foreground border border-border'
             }`}
           >
-            {f.label}
-            <span className="ml-1 opacity-70">{f.count}</span>
+            {f.label} <span className="opacity-60 ml-0.5">{f.count}</span>
           </button>
         ))}
       </div>
 
-      {/* Contenido principal */}
       <main className="px-3 py-3">
         {loading ? (
           <div className="flex justify-center p-10">
             <Loader2 className="animate-spin text-primary w-8 h-8" />
           </div>
         ) : error ? (
-          <div className="text-center p-10 bg-white border border-danger/20 rounded-xl">
+          <div className="text-center p-10 bg-card border border-danger/20 rounded-2xl">
             <AlertCircle size={32} className="text-danger mx-auto mb-3" />
             <p className="text-danger text-sm font-bold mb-3">{error}</p>
             <button
@@ -227,7 +222,7 @@ export default function Catalog() {
           </div>
         ) : filteredItems.length === 0 ? (
           <div className="text-center p-10 text-muted-foreground text-sm">
-            {search ? 'No se encontraron productos para esta busqueda.' : 'No hay productos disponibles.'}
+            {search ? 'No se encontraron productos para esta búsqueda.' : 'No hay productos disponibles.'}
           </div>
         ) : (
           <div className="space-y-4">
@@ -239,41 +234,43 @@ export default function Catalog() {
               }, 0);
 
               return (
-                <div key={group.key} className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
-                  {/* Subgroup header — clickable accordion */}
+                <div key={group.key}>
+                  {/* Subgroup header */}
                   <button
                     onClick={() => toggleSubgroup(group.key)}
-                    className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 border-b border-border hover:bg-gray-100 transition-colors"
+                    className="w-full flex items-center justify-between px-1 py-2"
                   >
                     <div className="flex items-center gap-2">
-                      <h2 className="font-bold text-sm text-foreground">{group.label}</h2>
-                      <span className="text-xs text-muted-foreground bg-secondary px-2 py-0.5 rounded-full">
+                      <h2 className="font-black text-sm text-foreground">{group.label}</h2>
+                      <span className="text-[10px] text-muted-foreground bg-secondary border border-border px-2 py-0.5 rounded-full">
                         {group.items.length}
                       </span>
                       {groupCartCount > 0 && (
-                        <span className="flex items-center gap-0.5 text-xs font-bold text-primary bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100">
-                          <ShoppingCart className="w-3 h-3" />
-                          {groupCartCount}
+                        <span className="flex items-center gap-0.5 text-[10px] font-bold text-primary bg-blue-50 px-2 py-0.5 rounded-full border border-border">
+                          <ShoppingCart className="w-2.5 h-2.5" /> {groupCartCount}
                         </span>
                       )}
                     </div>
                     <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${isCollapsed ? '-rotate-90' : ''}`} />
                   </button>
 
-                  {/* Productos */}
                   {!isCollapsed && (
-                    <div className="divide-y divide-border">
+                    <div className="grid grid-cols-2 gap-2.5">
                       {group.items.map(item => {
-                        const cartQty = getCartQty(item.id);
-                        const inCart = cartQty !== "";
+                        const qty = getCartQty(item.id);
+                        const inCart = qty > 0;
 
                         return (
                           <div
                             key={item.id}
-                            className={`px-4 py-3 flex items-center gap-3 transition-colors ${inCart ? 'bg-blue-50/40' : ''}`}
+                            className={`bg-card rounded-2xl overflow-hidden transition-all ${
+                              inCart
+                                ? 'border-2 border-accent shadow-lg shadow-accent/15'
+                                : 'border border-border shadow-sm'
+                            }`}
                           >
-                            {/* Thumbnail: foto pública de Odoo (lazy) o placeholder por categoría */}
-                            <div className="flex-shrink-0 w-12 h-12 rounded-lg overflow-hidden bg-secondary border border-border flex items-center justify-center">
+                            {/* Image area */}
+                            <div className="relative h-24 bg-gradient-to-br from-secondary to-[#DBEAFE] flex items-center justify-center">
                               {item.image_url && !brokenImg.has(item.id) ? (
                                 // eslint-disable-next-line @next/next/no-img-element
                                 <img
@@ -284,44 +281,59 @@ export default function Catalog() {
                                   onError={() => setBrokenImg(prev => { const n = new Set(prev); n.add(item.id); return n; })}
                                 />
                               ) : item.family_key === 'KOLD' ? (
-                                <Package className="w-5 h-5 text-muted-foreground/40" />
+                                <Package className="w-10 h-10 text-primary/30" />
                               ) : (
-                                <Snowflake className="w-5 h-5 text-muted-foreground/40" />
+                                <Snowflake className="w-10 h-10 text-primary/30" />
+                              )}
+                              {inCart && (
+                                <span className="absolute top-0 right-0 bg-accent text-white text-[7px] font-black px-2 py-1 rounded-bl-xl tracking-wide">
+                                  EN CARRITO
+                                </span>
                               )}
                             </div>
 
-                            <div className="flex-1 min-w-0">
-                              <h3 className="font-semibold text-sm text-foreground leading-tight line-clamp-2" title={item.name}>
+                            {/* Body */}
+                            <div className="p-2.5">
+                              <h3
+                                className={`text-[10px] font-bold leading-tight mb-1 min-h-[28px] ${inCart ? 'text-accent' : 'text-foreground'}`}
+                                title={item.name}
+                              >
                                 {item.name}
                               </h3>
-                              <div className="flex items-center gap-2 mt-1">
-                                {item.sku && <span className="text-[10px] text-muted-foreground">SKU: {item.sku}</span>}
-                                <span className="text-[10px] text-muted-foreground">{item.uom}</span>
+                              <div className="flex items-center gap-1 mb-1.5">
+                                <span className="text-[8px] text-muted-foreground">{item.uom}</span>
                                 {item.boxSize > 1 && (
-                                  <span className="text-[10px] font-bold text-primary bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100">
-                                    Caja: {item.boxSize}
+                                  <span className="text-[8px] font-bold text-primary bg-secondary border border-border px-1.5 rounded-full">
+                                    ×{item.boxSize}
                                   </span>
                                 )}
                               </div>
-                            </div>
+                              <p className={`text-[15px] font-black mb-2 ${inCart ? 'text-primary' : 'text-foreground'}`}>
+                                ${item.price.toFixed(2)}
+                              </p>
 
-                            <div className="text-right flex-shrink-0">
-                              <span className="font-extrabold text-foreground text-sm">${item.price.toFixed(2)}</span>
-                            </div>
-
-                            <div className="flex-shrink-0">
-                              <input
-                                type="number"
-                                min="0"
-                                value={cartQty}
-                                onChange={(e) => handleQtyChange(item.id, e, item)}
-                                placeholder="0"
-                                className={`w-16 h-9 border rounded-lg text-center font-bold text-sm outline-none transition-colors ${
-                                  inCart
-                                    ? 'bg-primary/10 border-primary text-primary focus:ring-2 focus:ring-primary'
-                                    : 'bg-secondary border-border text-foreground focus:ring-2 focus:ring-primary focus:border-primary'
-                                }`}
-                              />
+                              {/* +/- controls */}
+                              <div className="flex items-center justify-between">
+                                <button
+                                  onClick={() => handleDecrement(item)}
+                                  className={`w-[30px] h-[30px] rounded-lg flex items-center justify-center text-lg font-bold transition-colors ${
+                                    inCart
+                                      ? 'bg-blue-100 text-accent border-none'
+                                      : 'border border-border bg-card text-muted-foreground'
+                                  }`}
+                                >
+                                  −
+                                </button>
+                                <span className={`text-sm font-black w-6 text-center ${inCart ? 'text-accent' : 'text-foreground'}`}>
+                                  {qty}
+                                </span>
+                                <button
+                                  onClick={() => handleIncrement(item)}
+                                  className="w-[30px] h-[30px] rounded-lg bg-primary text-white flex items-center justify-center text-lg font-bold"
+                                >
+                                  +
+                                </button>
+                              </div>
                             </div>
                           </div>
                         );
@@ -335,18 +347,18 @@ export default function Catalog() {
         )}
       </main>
 
-      {/* Floating cart indicator — above bottom navbar */}
+      {/* Floating cart bar */}
       {totalCartItems > 0 && (
-        <a
+        <Link
           href="/cart"
-          className="fixed bottom-20 right-4 bg-primary text-white rounded-full px-5 py-3 shadow-lg flex items-center gap-2 z-30 hover:bg-primary/90 transition-colors"
+          className="fixed bottom-20 left-3 right-3 bg-gradient-to-r from-primary to-accent text-white rounded-2xl px-4 py-3 shadow-xl shadow-primary/35 flex items-center justify-between z-30"
         >
-          <ShoppingCart className="w-5 h-5" />
-          <span className="font-bold text-sm">{totalCartItems} items</span>
-          <span className="text-xs opacity-80">
-            ${cartItems.reduce((sum, i) => sum + i.price * i.qty, 0).toFixed(2)}
-          </span>
-        </a>
+          <div className="flex items-center gap-2">
+            <ShoppingCart className="w-4 h-4" />
+            <span className="font-bold text-sm">{totalCartItems} producto{totalCartItems !== 1 ? 's' : ''}</span>
+          </div>
+          <span className="font-black text-sm">${totalCartValue.toFixed(2)} →</span>
+        </Link>
       )}
     </div>
   );
