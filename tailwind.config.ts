@@ -9,28 +9,28 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        background: "#F8FAFC",
-        foreground: "#0F172A",
+        background: "#EFF6FF",
+        foreground: "#1E293B",
         primary: {
-          DEFAULT: "#0066FF",
+          DEFAULT: "#1E3A8A",
           foreground: "#ffffff",
         },
         secondary: {
-          DEFAULT: "#E2E8F0",
+          DEFAULT: "#EFF6FF",
           foreground: "#1E293B",
         },
         accent: {
-          DEFAULT: "#00B4FF",
+          DEFAULT: "#2563EB",
           foreground: "#ffffff",
         },
         card: {
           DEFAULT: "#ffffff",
-          foreground: "#0F172A",
+          foreground: "#1E293B",
         },
-        border: "#CBD5E1",
+        border: "#DBEAFE",
         muted: {
-          DEFAULT: "#F1F5F9",
-          foreground: "#64748B",
+          DEFAULT: "#EFF6FF",
+          foreground: "#6B7280",
         },
         success: "#10B981",
         warning: "#F59E0B",
