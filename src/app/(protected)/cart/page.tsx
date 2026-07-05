@@ -31,7 +31,8 @@ export default function CartPage() {
       .then(data => {
         if (!data.error) {
           setPartner(data);
-          // Canal tradicional B2B: solo efectivo/tarjeta. Default efectivo.
+          // Default efectivo. Crédito solo aparece como opción si
+          // credit_limit > 0 (y el server lo revalida en orders/create).
         }
         setLoadingProfile(false);
       })
@@ -252,6 +253,8 @@ export default function CartPage() {
           {!loadingProfile && (
             <div className="space-y-1">
               <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Método de Pago</label>
+              {/* Crédito solo se ofrece si el cliente tiene crédito AUTORIZADO
+                  (credit_limit > 0). El server lo revalida en orders/create. */}
               <select
                 value={paymentMethod}
                 onChange={e => setPaymentMethod(e.target.value)}
@@ -259,6 +262,9 @@ export default function CartPage() {
               >
                 <option value="efectivo">Efectivo contra entrega</option>
                 <option value="tarjeta">Tarjeta</option>
+                {partner && partner.credit_limit > 0 && (
+                  <option value="credito">Crédito</option>
+                )}
               </select>
             </div>
           )}

@@ -5,6 +5,11 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
+// Cache del indicador de deuda para NO consultar Odoo en cada navegación.
+// Vive a nivel módulo: una consulta por carga de la app, refrescada por TTL.
+let debtCache: { hasDebt: boolean; ts: number } | null = null;
+const DEBT_TTL_MS = 5 * 60 * 1000;
+
 export default function BottomNav() {
   const pathname = usePathname();
   const [mounted, setMounted] = useState(false);
@@ -13,15 +18,21 @@ export default function BottomNav() {
 
   useEffect(() => {
     setMounted(true);
+    if (debtCache && Date.now() - debtCache.ts < DEBT_TTL_MS) {
+      setHasDebt(debtCache.hasDebt);
+      return;
+    }
     fetch('/api/b2b/invoices')
       .then(res => res.json())
       .then(data => {
         if (!data.error && Array.isArray(data)) {
-          setHasDebt(data.some((inv: any) => new Date(inv.invoice_date_due) < new Date()));
+          const overdue = data.some((inv: any) => new Date(inv.invoice_date_due) < new Date());
+          debtCache = { hasDebt: overdue, ts: Date.now() };
+          setHasDebt(overdue);
         }
       })
       .catch(() => {});
-  }, [pathname]);
+  }, []);
 
   const navItems = [
     { name: "Catálogo", href: "/catalog", icon: Package },
