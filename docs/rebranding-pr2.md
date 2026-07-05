@@ -19,7 +19,12 @@
 - `public/brand/grupo-frio-logo-mark.png` — mark cuadrado (solo el cubo isométrico, 231×231, transparente), extraído por recorte del logo oficial. Se usa en el chip del header del catálogo; el logo completo vive en la portada.
 - `public/icon-192.png` / `public/icon-512.png` — íconos PWA regenerados: mark oficial centrado al 62% sobre fondo blanco (zona segura maskable).
 - `src/app/favicon.ico` — regenerado desde el mark oficial (16/32/48 px).
-- El copo/monograma placeholder quedó eliminado de la UI. Único punto pendiente de diseño: si la dirección de marca prefiere el logo sobre fondo distinto al blanco en los íconos, es cambio de 1 script.
+- **No queda ningún placeholder de marca en la UI.** Los únicos placeholders restantes son los de foto de producto en el catálogo (ícono genérico cuando el producto no tiene imagen en Odoo) — no son marca y se resuelven poblando `image_128` en Odoo (tarea de datos). Nota opcional: si en el futuro la dirección de marca prefiere los íconos PWA sobre un fondo distinto al blanco, es un cambio de 1 script sin tocar código de la app.
+
+## Alcance y estado de este PR
+
+- Rebranding + portada + copy + assets oficiales únicamente. **No** incluye: rewards live, canje, `/home`, cambios de lógica de pedidos, cambios en Odoo (solo hubo una LECTURA para obtener el logo corporativo) ni cambios en n8n (el copy del bot de arriba es solo propuesta).
+- El PR permanece en **draft** hasta S/N de Yamil. **Merge a `main` = deploy automático a producción.**
 
 ## Copy sugerido para el bot de WhatsApp (n8n) — NO aplicado en este PR
 
