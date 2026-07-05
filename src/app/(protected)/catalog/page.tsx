@@ -152,29 +152,50 @@ export default function Catalog() {
   return (
     <div className="min-h-screen bg-background pb-36">
       {/* Header */}
-      <div className="bg-gradient-to-br from-[#1E3A8A] to-[#2563EB] pt-10 pb-4 px-4 shadow-lg">
+      <div className="bg-gradient-to-br from-[#005A8D] to-[#00B8D4] pt-10 pb-4 px-4 shadow-lg">
         <div className="flex justify-between items-start mb-3">
-          <div className="min-w-0 flex-1">
-            <p className="text-white/60 text-[9px] font-bold tracking-[0.15em] uppercase mb-0.5">Portal Distribuidores · KOLDOS</p>
-            <h1 className="text-white text-lg font-black tracking-tight truncate">{partner?.name || 'Cargando...'}</h1>
+          <div className="min-w-0 flex-1 flex items-center gap-2.5">
+            {/* Mark oficial GF en chip blanco — el logo completo vive en la portada */}
+            <div className="w-9 h-9 bg-white rounded-xl flex-shrink-0 flex items-center justify-center shadow-sm">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/brand/grupo-frio-logo-mark.png" alt="Grupo Frío" width={26} height={26} />
+            </div>
+            <div className="min-w-0">
+              <p className="text-white/70 text-[9px] font-bold tracking-[0.15em] uppercase mb-0.5">Portal de Clientes Grupo Frío</p>
+              <h1 className="text-white text-lg font-black tracking-tight truncate">
+                {partner?.name ? `Hola, ${partner.name}` : 'Bienvenido'}
+              </h1>
+            </div>
           </div>
-          <div className="bg-white/12 rounded-xl px-3 py-2 text-right flex-shrink-0 ml-3">
-            <p className="text-white/60 text-[8px] font-bold tracking-widest uppercase">Disponible</p>
-            <p className="text-white font-extrabold text-base">
-              ${(partner ? (partner.credit_limit - partner.credit_used) : 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
-            </p>
-          </div>
+          {/* Bloque financiero SOLO para clientes con crédito autorizado.
+              Al cliente de contado no se le muestra "$0.00 disponible". */}
+          {partner && partner.credit_limit > 0 && (
+            <div className="bg-white/15 rounded-xl px-3 py-2 text-right flex-shrink-0 ml-3">
+              <p className="text-white/70 text-[8px] font-bold tracking-widest uppercase">Crédito disponible</p>
+              <p className="text-white font-extrabold text-base">
+                ${(partner.credit_limit - partner.credit_used).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+              </p>
+            </div>
+          )}
         </div>
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-white/50 w-4 h-4" />
           <input
             type="text"
-            placeholder="Buscar producto o SKU..."
+            placeholder="Buscar producto..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full h-10 bg-white/15 rounded-xl pl-9 pr-4 text-sm text-white placeholder:text-white/40 outline-none focus:bg-white/20 transition-colors"
           />
         </div>
+      </div>
+
+      {/* Teaser de recompensas — sin números ni saldos: el programa aún no está en vivo */}
+      <div className="bg-amber-50 border-b border-amber-100 px-4 py-2 flex items-center gap-2">
+        <span aria-hidden="true">⭐</span>
+        <p className="text-[11px] font-bold text-amber-700">
+          Muy pronto tus compras sumarán puntos y recompensas Grupo Frío.
+        </p>
       </div>
 
       {/* Family tabs */}
@@ -270,7 +291,7 @@ export default function Catalog() {
                             }`}
                           >
                             {/* Image area */}
-                            <div className="relative h-24 bg-gradient-to-br from-secondary to-[#DBEAFE] flex items-center justify-center">
+                            <div className="relative h-24 bg-gradient-to-br from-secondary to-[#DBEFF9] flex items-center justify-center">
                               {item.image_url && !brokenImg.has(item.id) ? (
                                 // eslint-disable-next-line @next/next/no-img-element
                                 <img

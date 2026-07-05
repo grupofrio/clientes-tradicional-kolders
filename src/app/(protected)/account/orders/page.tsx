@@ -112,7 +112,7 @@ export default function OrderHistory() {
   return (
     <div className="min-h-screen bg-background pb-32">
       {/* Header */}
-      <div className="bg-gradient-to-br from-[#1E3A8A] to-[#2563EB] pt-10 pb-4 px-4 shadow-lg">
+      <div className="bg-gradient-to-br from-[#005A8D] to-[#00B8D4] pt-10 pb-4 px-4 shadow-lg">
         <div className="flex items-center gap-3">
           <button
             onClick={() => router.push('/account')}
@@ -141,7 +141,7 @@ export default function OrderHistory() {
           <div className="text-center p-10 bg-card border border-border rounded-2xl">
             <div className="text-4xl mb-3">🧊</div>
             <p className="font-bold text-foreground mb-1">Sin pedidos aún</p>
-            <p className="text-muted-foreground text-sm">Tus órdenes aparecerán aquí.</p>
+            <p className="text-muted-foreground text-sm">Tus pedidos aparecerán aquí.</p>
           </div>
         ) : (
           orders.map(order => (
@@ -191,7 +191,7 @@ export default function OrderHistory() {
                 >
                   {reorderingId === order.id
                     ? <Loader2 size={13} className="animate-spin" />
-                    : <RefreshCw size={13} />} Reordenar
+                    : <RefreshCw size={13} />} Repetir pedido
                 </button>
               </div>
             </div>

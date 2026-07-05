@@ -8,29 +8,31 @@ const config: Config = {
   ],
   theme: {
     extend: {
+      // Paleta institucional Grupo Frío (azul GF + cian hielo, verificada
+      // contra grupofrio.mx). El navy anterior era genérico, no de marca.
       colors: {
-        background: "#EFF6FF",
-        foreground: "#1E293B",
+        background: "#F0F9FF",
+        foreground: "#0F2A3D",
         primary: {
-          DEFAULT: "#1E3A8A",
+          DEFAULT: "#0077BB",
           foreground: "#ffffff",
         },
         secondary: {
-          DEFAULT: "#EFF6FF",
-          foreground: "#1E293B",
+          DEFAULT: "#F0F9FF",
+          foreground: "#0F2A3D",
         },
         accent: {
-          DEFAULT: "#2563EB",
+          DEFAULT: "#00B8D4",
           foreground: "#ffffff",
         },
         card: {
           DEFAULT: "#ffffff",
-          foreground: "#1E293B",
+          foreground: "#0F2A3D",
         },
-        border: "#DBEAFE",
+        border: "#DBEFF9",
         muted: {
-          DEFAULT: "#EFF6FF",
-          foreground: "#6B7280",
+          DEFAULT: "#F0F9FF",
+          foreground: "#5B7285",
         },
         success: "#10B981",
         warning: "#F59E0B",

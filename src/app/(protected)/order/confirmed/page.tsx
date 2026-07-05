@@ -21,7 +21,7 @@ function ConfirmationContent() {
          const res = await fetch(`/api/account/profile`);
          const data = await res.json();
          const waNumber = data.executive_phone || process.env.NEXT_PUBLIC_WA_SALES || '5218110000000';
-         window.open(`https://wa.me/${waNumber}?text=${encodeURIComponent(`Hola soy ${data.name} (B2B). Quisiera saber sobre mi pedido ${orderName}`)}`, '_blank');
+         window.open(`https://wa.me/${waNumber}?text=${encodeURIComponent(`Hola, soy ${data.name}. Quisiera saber sobre mi pedido ${orderName}`)}`, '_blank');
      } catch (e) {
          window.open(`https://wa.me/${process.env.NEXT_PUBLIC_WA_SALES || '5218110000000'}?text=${encodeURIComponent(`Hola. Quisiera saber sobre mi pedido ${orderName}`)}`, '_blank');
      }
@@ -43,8 +43,8 @@ function ConfirmationContent() {
 
        <p className="text-muted-foreground mb-8 text-balance max-w-sm">
            {isConfirmed
-             ? `Reserva autorizada en almacén. Tu ejecutivo comercial ${executiveName} ya ha sido notificado sobre la entrega próxima.`
-             : `Tu pedido ${orderName} fue recibido. Tu ejecutivo revisará disponibilidad y entrega, y te confirmará en breve.`
+             ? `Tu pedido está confirmado. Tu asesor ${executiveName} ya fue notificado para coordinar tu entrega.`
+             : `Tu pedido ${orderName} fue recibido. Tu asesor revisará la disponibilidad y la entrega, y te confirmará en breve.`
            }
        </p>
 

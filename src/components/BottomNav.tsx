@@ -38,7 +38,7 @@ export default function BottomNav() {
     { name: "Catálogo", href: "/catalog", icon: Package },
     { name: "Carrito", href: "/cart", icon: ShoppingCart, badge: mounted ? totalItems : 0 },
     { name: "Pedidos", href: "/account/orders", icon: ClipboardList },
-    { name: "Cuenta", href: "/account", icon: User, showDot: hasDebt },
+    { name: "Mi cuenta", href: "/account", icon: User, showDot: hasDebt },
   ];
 
   return (

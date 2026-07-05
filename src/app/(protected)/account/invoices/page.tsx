@@ -83,7 +83,7 @@ export default function InvoicesPage() {
   return (
     <div className="min-h-screen bg-background pb-32">
       {/* Header */}
-      <div className="bg-gradient-to-br from-[#1E3A8A] to-[#2563EB] pt-10 pb-4 px-4 shadow-lg">
+      <div className="bg-gradient-to-br from-[#005A8D] to-[#00B8D4] pt-10 pb-4 px-4 shadow-lg">
         <div className="flex items-center gap-3">
           <button
             onClick={() => router.push('/account')}
@@ -91,7 +91,7 @@ export default function InvoicesPage() {
           >
             <ArrowLeft size={18} />
           </button>
-          <h1 className="text-white text-lg font-black">Facturación y Pagos</h1>
+          <h1 className="text-white text-lg font-black">Mis pagos</h1>
         </div>
       </div>
 
@@ -99,13 +99,13 @@ export default function InvoicesPage() {
         {/* Total debt summary */}
         {!loading && invoices.length > 0 && (
           <div className={`p-5 rounded-2xl border shadow-sm ${hasVencidas ? 'bg-danger/5 border-danger/30' : 'bg-card border-border'}`}>
-            <p className="text-[9px] uppercase font-black text-muted-foreground mb-1 tracking-wider">Deuda Total Pendiente</p>
+            <p className="text-[9px] uppercase font-black text-muted-foreground mb-1 tracking-wider">Pagos pendientes</p>
             <p className={`text-4xl font-black tracking-tight ${hasVencidas ? 'text-danger' : 'text-foreground'}`}>
               ${totalDeuda.toLocaleString('en-US', { minimumFractionDigits: 2 })}
             </p>
             {hasVencidas && (
               <p className="text-danger flex items-center gap-1 text-xs font-bold mt-2">
-                <AlertCircle size={13} /> Tienes facturas vencidas bloqueando crédito
+                <AlertCircle size={13} /> Tienes pagos vencidos. Ponte al corriente para no detener tus entregas
               </p>
             )}
           </div>
@@ -128,7 +128,7 @@ export default function InvoicesPage() {
           <div className="text-center p-10 bg-card border border-border rounded-2xl">
             <CheckCircle2 size={40} className="text-success mx-auto mb-3" />
             <h3 className="font-black text-foreground mb-1">Al corriente</h3>
-            <p className="text-muted-foreground text-sm">No tienes facturas pendientes de pago.</p>
+            <p className="text-muted-foreground text-sm">No tienes pagos pendientes. ¡Gracias por comprar con Grupo Frío!</p>
           </div>
         ) : (
           <div className="space-y-3">
