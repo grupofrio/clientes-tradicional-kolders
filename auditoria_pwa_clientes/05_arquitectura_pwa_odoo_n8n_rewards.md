@@ -100,6 +100,9 @@
 4. Unique constraint sobre la key → un reintento devuelve el canje original (replay), nunca duplica. (Patrón ya probado en este ecosistema con `x_kold_idempotency_key` en `sale.order`.)
 5. **Reversa (DECIDIDO: existe):** si se cancela un pedido que generó puntos, Odoo revierte esos puntos. Mitigación estructural: abonar al entregar/facturar, no al crear. La mecánica del caso "puntos ya gastados en un canje" (saldo negativo controlado / ajuste pendiente / bloquear canjes hasta compensar) **la propone Sebastián** — es parte del mismo dominio Odoo, jamás de la PWA ni de n8n.
 6. **Estado de entrega/aplicación vive en Odoo:** operación marca el canje como entregado/aplicado ahí; PWA y bot solo lo leen.
+7. **Acumulación (DECIDIDO, Yamil):** los puntos se abonan **al cumplir la condición comercial** — contado: entrega/cobro; crédito: pago — nunca al crear el pedido. Base de cálculo: **total pagado** (con IVA 0% real en productos GF, coincide con `amount_total` de Odoo). Ni PWA ni n8n calculan puntos jamás.
+8. **Regla de naming (Codex):** esto solo se llama "canje automático" cuando el método atómico existe y responde. Sin él, la funcionalidad — en docs, PRs y UI — se llama **"solicitud de canje"**.
+9. **Gate de activación:** el canje live requiere además **catálogo piloto de recompensas autorizado** (operación/comercial/finanzas) — hoy no hay presupuesto formal; recompensas iniciales de bajo costo protegidas por el límite 1 canje/mes.
 
 **Quién lo construye:** Sebastián (territorio Odoo). **Quién lo consume:** PWA (PR 5) y después el bot (fase 2). La PWA/n8n jamás hacen `write` directo sobre `loyalty.card.points`.
 
@@ -134,4 +137,5 @@
 
 1. **Odoo (Sebastián):** ampliar programa loyalty a B2B (cuestionario doc 01 §3.1) + método atómico de canje + permisos del usuario de servicio + (dato) fotos `image_128` de productos.
 2. **n8n (Claude/Yamil):** intents nuevos del bot (portal/pedidos/puntos), reconocimiento del prefijo identificado, webhook de canjes a operación, verificación TTL/un-solo-uso del token W15. n8n productivo es fuente de verdad — cambios con snapshot previo y S/N, como siempre.
+   **Secretos (Codex):** el número del bot vive en `NEXT_PUBLIC_WA_BOT` (nunca hardcodeado en frontend); los webhooks n8n se protegen con **secreto server-side** (header compartido que n8n verifica); todas las env vars/secretos se administran por Sebas/infra en Vercel — el código del frontend no contiene secretos ni números.
 3. **Operación:** los modos de entrega ya están DECIDIDOS (con el siguiente pedido / descuento en siguiente factura-pedido; entrega independiente en ruta queda fuera de fase inicial). Falta solo definir el procedimiento operativo: quién agrega la línea/descuento al siguiente pedido y quién marca "entregado/aplicado" en Odoo.

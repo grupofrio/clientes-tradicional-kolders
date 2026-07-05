@@ -133,8 +133,8 @@ Nada de esto debe asumirse: **validar contra el Odoo productivo antes de escribi
 4. ¿Puede aplicar a clientes `company_type='company'` (B2B)? ¿Hay restricción de website/pricelist?
 
 **B. Acumulación**
-5. ¿Los puntos se acumulan al **confirmar pedido, facturar, entregar o pagar**? (decisión de negocio + configuración; recomendación: al facturar o entregar, para no premiar pedidos cancelados).
-6. ¿Regla de acumulación: puntos por $ MXN, por unidad, por producto/categoría (¿solo hielo? ¿también Kold?)? ¿Redondeo?
+5. ~~¿Cuándo se acumulan los puntos?~~ **DECIDIDO (Yamil): al pagar/cumplir la condición comercial, NO al crear el pedido.** Cliente de contado → al momento de **entrega/cobro**; cliente de crédito → al momento del **pago**. Esto reduce reversas por pedidos cancelados/no pagados. **Pendiente técnico (Sebas):** qué evento de Odoo dispara cada caso (validación de entrega/pago registrado) y cómo se configura en el programa.
+6. ~~¿Sobre qué base se calculan?~~ **DECIDIDO: sobre el total pagado.** Nota de negocio: los productos GF tienen **IVA 0%**, así que total con IVA = total real de Odoo. Regla técnica derivada: **la PWA nunca asume IVA (ni 0 ni 16) — siempre usa el total real de Odoo** (conecta con bug B5). **Pendiente técnico (Sebas):** tasa puntos/$ y redondeo; ¿aplican todas las familias (hielo y Kold) o hay exclusiones?
 7. ¿Programa por compañía (34 Glaciem) o multi-compañía / por plaza? ¿Un cliente de Guadalajara y uno de Iguala juegan el mismo programa?
 8. ¿Los pedidos creados por el usuario de servicio (RPC) acumulan igual que los creados en UI?
 
@@ -209,9 +209,13 @@ Variable server `REWARDS_MODE = off | teaser | live`:
 | **Abuso de canjes** | Cubierto por el límite 1 canje/mes. El bloqueo por saldo vencido queda DESACTIVADO en fase inicial (decisión de negocio: canal de contado); la arquitectura lo deja activable después |
 | **Saldo mostrado ≠ saldo real** (momento de acumulación confuso) | Copy explícito: "los puntos se abonan cuando se entrega/factura tu pedido" según regla elegida (pregunta 5) |
 
-### 3.4 Fase técnica intermedia admisible
+### 3.4 Fase técnica intermedia admisible + regla de naming (auditoría Codex)
 
 La arquitectura objetivo es canje automático. Si el método atómico de Odoo (pregunta 19) tarda, la **única** fase intermedia aceptable es: `redeem` crea la solicitud en Odoo (registro con folio, SIN descontar puntos aún) + notificación n8n al ejecutivo, y la UI lo muestra como "Canje en proceso". Nunca lanzar un canje "automático" hecho con read-then-write en múltiples RPC — es la versión con condición de carrera.
+
+**Regla de naming (obligatoria en docs, PRs y UI interna):** solo se llama **"canje automático"** a lo que ejecuta el método atómico de Odoo. Mientras ese método no exista, la funcionalidad se llama **"solicitud de canje"** — sin excepciones, para que nadie (Yamil, Codex, Sebas, operación) crea que hay garantías transaccionales donde no las hay.
+
+**Gate adicional (decisión Yamil):** aunque el método atómico exista, el canje NO se activa en vivo sin **catálogo piloto de recompensas autorizado por operación/comercial/finanzas** (hoy no hay presupuesto formal de recompensas). No bloquea PR 1–3; bloquea el switch a `REWARDS_MODE=live` del canje.
 
 ---
 
@@ -253,7 +257,7 @@ Es decir: **la identidad y el ciclo de vida del cliente ya fluyen por n8n.** Lo 
 | B2 | **Reordenar calcula mal el IVA mostrado** | `account/orders/page.tsx:30-43` | `handleReorder` agrega líneas **sin `tax_rate`** (y sin SKU), así que el carrito muestra IVA $0 para pedidos reordenados aunque Odoo sí lo cobrará. El total visible ≠ total real |
 | B3 | **Fetch de facturas en cada navegación** | `BottomNav.tsx:14-24` | El nav dispara `GET /api/b2b/invoices` (RPC a Odoo) en **cada cambio de ruta**, solo para pintar un puntito rojo |
 | B4 | Bloque de crédito muerto en carrito | `cart/page.tsx:266-282` | El `<select>` solo ofrece efectivo/tarjeta, pero queda el bloque condicional `paymentMethod === 'credito'` y la autoconfirmación server-side solo aplica a crédito → hoy **ningún pedido PWA se autoconfirma** (¿intencional?) |
-| B5 | `total_con_iva` server asume 16% | `orders/create/route.ts:385` | El server calcula `subtotal * 1.16` para el check de crédito, contradiciendo la política "no inventar IVA" del catálogo |
+| B5 | `total_con_iva` server asume 16% | `orders/create/route.ts:385` | Precisión (auditoría Codex): las líneas del pedido SÍ mandan los impuestos reales a Odoo — lo incorrecto es que `total_con_iva = subtotal * 1.16` se usa para el **check de crédito/autoconfirmación y la respuesta**. Con IVA 0% real (regla 6), infla el total un 16%. Debe sustituirse por el total real que Odoo persiste (`amount_total`, que ya se relee en el paso 8 del endpoint) |
 
 ### Código muerto / higiene
 - Endpoints OTP muertos: `api/auth/request-link`, `api/auth/verify-code`, más `hashOtp()` en `lib/auth.ts`. **Antes de borrar: confirmar en n8n que ningún workflow los llama.**
@@ -273,6 +277,8 @@ Es decir: **la identidad y el ciclo de vida del cliente ya fluyen por n8n.** Lo 
 - **Auto-deploy a producción desde `main` sin PR obligatorio** — riesgo #1 operativo.
 - **Token en URL** (query `?token&phone`): historial del navegador, logs. Mitigar: TTL corto y un solo uso en W15 (verificar), `history.replaceState` tras validar.
 - Sin rate limiting en `/api/auth/verify` (verificar si W15 limita).
+- **(Auditoría Codex) Guardrails mínimos para mutaciones autenticadas por cookie — requisito ANTES de sumar rewards** (hoy `orders/create`, `cart/validate` y logout mutan solo con la cookie `session`, sameSite=lax): **rate limit** en auth y mutaciones; **Origin/Referer guard** (rechazar mutaciones cross-origin); **protección CSRF o equivalente** (p.ej. header custom requerido + verificación de origen); **preview mutation guard** — en deployments de preview, las mutaciones reales contra Odoo productivo se bloquean salvo allowlist explícita (p.ej. `PREVIEW_MUTATIONS_ALLOWLIST` de partner_ids de prueba). Sin allowlist, en preview solo se prueba hasta el carrito.
+- **(Auditoría Codex) Bot y secretos:** número del bot en `NEXT_PUBLIC_WA_BOT` (nunca hardcodeado); webhooks n8n protegidos con **secreto server-side** (header compartido verificado en n8n); todas las env vars/secretos administrados por Sebas/infra en Vercel — nada de secretos ni números en el código del frontend.
 - La sesión de servicio Odoo ve todas las compañías → **cada endpoint nuevo de rewards debe repetir el patrón de validación de propiedad por partner** (mismo estándar que invoices/pdf).
 - PWA `start_url: "/"`: el cliente con sesión cae en la portada de marketing (la portada no redirige a home).
 - Catálogo lee `image_128` de todos los productos por request (aceptable solo en piloto).

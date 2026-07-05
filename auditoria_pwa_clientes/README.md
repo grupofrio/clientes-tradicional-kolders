@@ -22,7 +22,22 @@ Las 4 reglas de canje que estaban pendientes ya tienen decisión final:
 1. **Bloqueo por saldo vencido: NO en fase inicial.** La mayoría del canal tradicional es de contado; no se mete fricción financiera al piloto. `customer_blocked` por vencidos queda **desactivado**; la arquitectura debe permitir activarlo después si Grupo Frío lo decide; la UI no muestra mensajes de bloqueo por pagos vencidos salvo que Odoo devuelva explícitamente una regla futura.
 2. **Límite de canjes: máximo 1 canje al mes por cliente.** Se valida **en Odoo, dentro del método atómico** (nunca en frontend). Si ya canjeó ese mes, el endpoint responde error claro (`monthly_limit_reached`). Copy: *"Ya usaste tu canje de este mes. Podrás canjear otra recompensa el próximo mes."*
 3. **Reversa de puntos: SÍ existe.** Si se cancela el pedido que generó puntos, los puntos se revierten. Recomendación técnica: abonar puntos al **entregar/facturar/confirmar cumplimiento** (no al crear el pedido) para minimizar reversas. Si los puntos ya se usaron en un canje antes de la cancelación, el comportamiento seguro (saldo negativo controlado / ajuste pendiente / bloquear siguientes canjes hasta compensar) **lo propone Sebastián en Odoo**.
-4. **Modos de entrega iniciales: solo dos** — (a) recompensa física/producto gratis: **con el siguiente pedido**; (b) recompensa tipo descuento: **en la siguiente factura/pedido**. La entrega independiente en ruta queda FUERA de la fase inicial. Cada recompensa lleva `delivery_mode`; el folio devuelve instrucciones claras al cliente; operación/asesor **ejecuta** la entrega o aplicación, no aprueba el canje.
+4. **Modos de entrega iniciales: solo dos** — (a) recompensa física/producto gratis: **con el siguiente pedido**; (b) recompensa tipo descuento: **en la siguiente factura/pedido**. La entrega independiente en ruta queda FUERA de la fase inicial. **Cada recompensa define su propio `delivery_mode` — el cliente NO elige el modo de entrega.** El folio devuelve instrucciones claras; operación/asesor **ejecuta** la entrega o aplicación, no aprueba el canje.
+5. **Momento de acumulación de puntos:** los puntos se ganan **al pagar/cumplir la condición comercial, no al crear el pedido**. Cliente de contado → puntos al momento de **entrega/cobro**; cliente de crédito → puntos al momento del **pago**. Esto reduce estructuralmente las reversas por pedidos cancelados o no pagados.
+6. **Base de cálculo de puntos: el total pagado.** Nota de negocio: los productos de Grupo Frío tienen **IVA 0%**, por lo que el total con IVA coincide con el total real de Odoo. Regla técnica: **la PWA no asume IVA 0 ni IVA 16 — usa siempre el total real de Odoo**; el hardcode `subtotal * 1.16` de `orders/create` debe eliminarse (entra en PR 1).
+7. **Presupuesto/stock de recompensas: hoy NO existe presupuesto formal.** No bloquea PR 1, PR 2 ni PR 3. **SÍ bloquea el canje en vivo**: no se activa `redeem` live sin un **catálogo piloto de recompensas autorizado por operación/comercial/finanzas**. Recomendación: iniciar con recompensas de bajo costo, controladas por Odoo, protegidas por el límite de 1 canje/mes.
+8. **Promesa en portada (PR 2):** sí se promete recompensas desde el día 1, pero mientras Odoo no esté live, SOLO como teaser — sin puntos numéricos, sin saldos falsos, sin recompensas "canjeables" falsas.
+
+## Auditoría Codex (2026-07-04, contra docs + código real de `main` @ `0df926c`)
+
+Codex **confirmó** lo esencial: la PWA no tiene recompensas; Odoo debe ser fuente de verdad; la PWA no calcula ni descuenta puntos; el canje automático requiere método atómico en Odoo; el orden PR1→PR5 es razonable. **Correcciones incorporadas en esta v3:**
+- PR #10 sigue en draft; no se mergea aún.
+- PR 1 se acota a estabilidad/confianza únicamente (lista final archivo por archivo en doc 04).
+- PR 2 **no** apunta `start_url`/redirects a `/home` mientras `/home` no exista (o crea una ruta mínima estable).
+- Vercel Preview no debe poder crear pedidos/canjes reales contra Odoo productivo salvo **allowlist explícita**; sin allowlist, en preview solo se prueba hasta el carrito.
+- Guardrails mínimos para mutaciones con cookie antes de sumar rewards: rate limit, Origin/Referer guard, CSRF o equivalente, preview mutation guard.
+- Naming honesto: **solo se llama "canje automático" si existe el método atómico en Odoo; sin él, se llama "solicitud de canje"**.
+- Precisión del bug de `orders/create`: las líneas SÍ mandan impuestos reales a Odoo; lo incorrecto es `total_con_iva = subtotal * 1.16` usado para el check de crédito y la respuesta — debe sustituirse por el total real de Odoo.
 
 ## Documentos
 

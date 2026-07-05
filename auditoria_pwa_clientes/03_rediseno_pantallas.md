@@ -117,7 +117,7 @@ Formato: objetivo · estructura · copy/CTAs · estados · datos backend · qué
 ### 6. Confirmación (`/order/confirmed`, retocado)
 
 - Conservar estructura + **card dorada "⭐ Este pedido te suma X puntos"** + micro-celebración breve.
-- Nota de timing según regla de acumulación: *"Tus puntos se abonan cuando recibas tu pedido"* (ajustar al momento real que confirme Odoo — pregunta 5).
+- Nota de timing según la regla DECIDIDA de acumulación (al cumplir la condición comercial): contado → *"Tus puntos se abonan cuando recibas y pagues tu pedido"*; crédito → *"Tus puntos se abonan cuando se registre tu pago"*. El texto exacto se ajusta al evento técnico que confirme Sebas en Odoo.
 - Estados de pedido en llano: confirmado → *"Tu pedido está confirmado. Te lo lleva tu ruta de siempre."*; draft → *"Recibimos tu pedido. Tu asesor te confirma la entrega en breve."*
 
 ### 7. Recompensas / Mis puntos (`/rewards`) — pantalla ESTRATÉGICA, no secundaria
@@ -140,7 +140,7 @@ Formato: objetivo · estructura · copy/CTAs · estados · datos backend · qué
 
 - **Objetivo:** canjear en 3 toques con cero ambigüedad y cero riesgo de doble canje.
 - **Flujo:**
-  1. **Detalle:** imagen + nombre + descripción + **⭐ 1,500 pts** + disponibilidad + *"Te quedarían 240 pts"* → `Canjear ahora`.
+  1. **Detalle:** imagen + nombre + descripción + **⭐ 1,500 pts** + disponibilidad + *"Te quedarían 240 pts"* + **cómo se entrega** (lo define la recompensa vía su `delivery_mode` — **el cliente NO elige el modo de entrega**: producto gratis → llega con tu siguiente pedido; descuento → en tu siguiente factura/pedido) → `Canjear ahora`.
   2. **Confirmación (bottom sheet):** *"¿Confirmas tu canje? Vas a usar 1,500 puntos por: Bolsa Rolito 5kg gratis."* → `Sí, canjear` / `Todavía no`. (Doble toque intencional: es la única fricción permitida.)
   3. **Validación automática** — `POST /api/rewards/redeem` con `idempotency_key`; Odoo valida saldo + disponibilidad + bloqueos, **descuenta puntos y registra el canje en una sola transacción** (método atómico, doc 01 pregunta 19).
   4. **Éxito:** check animado breve + **folio `R-00045`** + nuevo saldo + **instrucciones de entrega** según `delivery_mode` (solo dos modos iniciales, DECIDIDO): *"Tu recompensa llega con tu siguiente pedido"* / *"Se aplicará como descuento en tu siguiente pedido/factura"*. (La entrega independiente en ruta queda fuera de la fase inicial.)
