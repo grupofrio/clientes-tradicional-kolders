@@ -3,38 +3,66 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, ArrowLeft, Download, AlertCircle, Copy, CheckCircle2 } from "lucide-react";
 
+// Datos bancarios SOLO desde env vars reales. Sin fallbacks inventados:
+// mostrar una CLABE falsa como si fuera real es un riesgo directo de dinero.
+const BANK_NAME = process.env.NEXT_PUBLIC_BANK_NAME || null;
+const BANK_CLABE = process.env.NEXT_PUBLIC_BANK_CLABE || null;
+const BANK_BENEFICIARY = process.env.NEXT_PUBLIC_BANK_BENEFICIARY || null;
+
 export default function InvoicesPage() {
   const router = useRouter();
   const [invoices, setInvoices] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  
+  const [loadError, setLoadError] = useState(false);
+
   const [showPaymentModal, setShowPaymentModal] = useState<any | null>(null);
   const [copied, setCopied] = useState(false);
   const [profile, setProfile] = useState<any>(null);
   const [downloadingPdf, setDownloadingPdf] = useState<number | null>(null);
 
-  useEffect(() => {
+  const fetchInvoices = () => {
     Promise.all([
-        fetch('/api/b2b/invoices').then(res => res.ok ? res.json() : []),
-        fetch('/api/account/profile').then(res => res.ok ? res.json() : null)
+        fetch('/api/b2b/invoices').then(res => {
+            if (!res.ok) throw new Error('invoices');
+            return res.json();
+        }),
+        // El perfil solo alimenta el mensaje de WhatsApp; si falla no bloquea la lista.
+        fetch('/api/account/profile').then(res => res.ok ? res.json() : null).catch(() => null)
     ]).then(([invData, profData]) => {
         if (Array.isArray(invData)) setInvoices(invData);
+        else setLoadError(true);
         if (profData && !profData.error) setProfile(profData);
         setLoading(false);
     }).catch(() => {
+        setLoadError(true);
         setLoading(false);
     });
+  };
+
+  useEffect(() => {
+    fetchInvoices();
   }, []);
 
+  const retryInvoices = () => {
+    setLoading(true);
+    setLoadError(false);
+    fetchInvoices();
+  };
+
+  // WhatsApp para comprobantes: ejecutivo real del cliente o número de ventas
+  // configurado. Sin número real no se muestra el botón.
+  const paymentsWa = profile?.executive_phone || process.env.NEXT_PUBLIC_WA_SALES || null;
+
   const handleCopyClabe = () => {
-      navigator.clipboard.writeText(process.env.NEXT_PUBLIC_BANK_CLABE || "012345678912345678");
+      if (!BANK_CLABE) return;
+      navigator.clipboard.writeText(BANK_CLABE);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
   }
 
   const handleWhatsappTransfer = () => {
-      if(!profile) return;
-      window.open(`https://wa.me/${process.env.NEXT_PUBLIC_WA_SALES || '5218110000000'}?text=${encodeURIComponent(`Hola. Adjunto comprobante de pago para la factura ${showPaymentModal.name} del socio ${profile.name}`)}`, '_blank');
+      if (!paymentsWa) return;
+      window.open(`https://wa.me/${paymentsWa}?text=${encodeURIComponent(`Hola. Adjunto comprobante de pago para la factura ${showPaymentModal.name}${profile ? ` del socio ${profile.name}` : ''}`)}`, '_blank');
       setShowPaymentModal(null);
   }
 
@@ -86,6 +114,15 @@ export default function InvoicesPage() {
         {loading ? (
           <div className="flex justify-center p-10">
             <Loader2 className="animate-spin text-primary w-8 h-8" />
+          </div>
+        ) : loadError ? (
+          <div className="text-center p-10 bg-card border border-danger/20 rounded-2xl">
+            <AlertCircle size={32} className="text-danger mx-auto mb-3" />
+            <p className="font-bold text-danger mb-1">No pudimos cargar tus facturas</p>
+            <p className="text-muted-foreground text-sm mb-4">Revisa tu conexión e intenta de nuevo.</p>
+            <button onClick={retryInvoices} className="text-primary text-sm font-bold underline">
+              Reintentar
+            </button>
           </div>
         ) : invoices.length === 0 ? (
           <div className="text-center p-10 bg-card border border-border rounded-2xl">
@@ -160,36 +197,56 @@ export default function InvoicesPage() {
                 <div className="bg-white w-full max-w-sm rounded-[2rem] p-6 shadow-2xl relative animate-in slide-in-from-bottom-10">
                     <button onClick={() => setShowPaymentModal(null)} className="absolute top-4 right-5 text-muted-foreground hover:text-foreground font-bold">X</button>
                     <h2 className="text-xl font-bold text-foreground mb-1">Instrucciones de Pago</h2>
-                    <p className="text-sm text-muted-foreground mb-6">Transfiere la cantidad correspondiente para la factura <strong>{showPaymentModal.name}</strong>.</p>
-                    
+                    <p className="text-sm text-muted-foreground mb-6">
+                      {BANK_CLABE
+                        ? <>Transfiere la cantidad correspondiente para la factura <strong>{showPaymentModal.name}</strong>.</>
+                        : <>Pago de la factura <strong>{showPaymentModal.name}</strong>.</>}
+                    </p>
+
                     <div className="space-y-4">
-                       <div className="bg-secondary p-4 rounded-xl space-y-3 relative">
-                          <div>
-                             <p className="text-[10px] text-muted-foreground uppercase font-bold">Banco Receptor</p>
-                             <p className="font-bold text-sm">{process.env.NEXT_PUBLIC_BANK_NAME || 'BBVA Bancomer'}</p>
-                          </div>
-                          <div>
-                             <p className="text-[10px] text-muted-foreground uppercase font-bold">Cuenta CLABE</p>
-                             <p className="font-extrabold text-lg text-primary font-mono tracking-widest">{process.env.NEXT_PUBLIC_BANK_CLABE || '012345678901234567'}</p>
-                          </div>
-                          <div>
-                             <p className="text-[10px] text-muted-foreground uppercase font-bold">Beneficiario / Concepto</p>
-                             <p className="font-bold text-sm">{process.env.NEXT_PUBLIC_BANK_BENEFICIARY || 'GLACIEM SA DE CV'}</p>
-                             <p className="text-xs text-muted-foreground mt-0.5">Ref: {showPaymentModal.name} - {profile?.name}</p>
-                          </div>
-                          <button onClick={handleCopyClabe} className="absolute right-4 top-[3rem] w-10 h-10 bg-white border border-border shadow-sm rounded-full flex items-center justify-center text-primary">
-                             {copied ? <CheckCircle2 size={16} className="text-success" /> : <Copy size={16} />}
-                          </button>
-                       </div>
+                       {BANK_CLABE ? (
+                         <div className="bg-secondary p-4 rounded-xl space-y-3 relative">
+                            {BANK_NAME && (
+                              <div>
+                                 <p className="text-[10px] text-muted-foreground uppercase font-bold">Banco Receptor</p>
+                                 <p className="font-bold text-sm">{BANK_NAME}</p>
+                              </div>
+                            )}
+                            <div>
+                               <p className="text-[10px] text-muted-foreground uppercase font-bold">Cuenta CLABE</p>
+                               <p className="font-extrabold text-lg text-primary font-mono tracking-widest">{BANK_CLABE}</p>
+                            </div>
+                            <div>
+                               {BANK_BENEFICIARY && (
+                                 <>
+                                   <p className="text-[10px] text-muted-foreground uppercase font-bold">Beneficiario / Concepto</p>
+                                   <p className="font-bold text-sm">{BANK_BENEFICIARY}</p>
+                                 </>
+                               )}
+                               <p className="text-xs text-muted-foreground mt-0.5">Ref: {showPaymentModal.name}{profile ? ` - ${profile.name}` : ''}</p>
+                            </div>
+                            <button onClick={handleCopyClabe} className="absolute right-4 top-[3rem] w-10 h-10 bg-white border border-border shadow-sm rounded-full flex items-center justify-center text-primary">
+                               {copied ? <CheckCircle2 size={16} className="text-success" /> : <Copy size={16} />}
+                            </button>
+                         </div>
+                       ) : (
+                         <div className="bg-secondary p-4 rounded-xl">
+                            <p className="text-sm font-medium text-foreground">
+                              Pídele los datos de pago a tu asesor{paymentsWa ? ' por WhatsApp' : ''}. Él te confirma la cuenta correcta para tu transferencia.
+                            </p>
+                         </div>
+                       )}
 
                        <div className="flex justify-between items-center py-2 px-1 border-b border-border/50">
                            <span className="font-bold text-sm text-muted-foreground">Monto Pendiente:</span>
                            <span className="font-extrabold flex text-lg">${showPaymentModal.amount_residual.toLocaleString('en-US', {minimumFractionDigits: 2})}</span>
                        </div>
 
-                       <button onClick={handleWhatsappTransfer} className="w-full bg-success text-white font-bold h-12 rounded-xl mt-2 flex items-center justify-center gap-2 shadow-lg shadow-success/20">
-                           Enviar Comprobante
-                       </button>
+                       {paymentsWa && (
+                         <button onClick={handleWhatsappTransfer} className="w-full bg-success text-white font-bold h-12 rounded-xl mt-2 flex items-center justify-center gap-2 shadow-lg shadow-success/20">
+                             {BANK_CLABE ? 'Enviar Comprobante' : 'Contactar a mi asesor'}
+                         </button>
+                       )}
                     </div>
                 </div>
             </div>

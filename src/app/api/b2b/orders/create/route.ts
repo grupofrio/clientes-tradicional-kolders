@@ -3,6 +3,7 @@ import { callKw } from '@/lib/odoo';
 import { verifyToken } from '@/lib/auth';
 import { resolvePricesForPartner, getPartnerPricelistId } from '@/lib/pricelist';
 import { getOdooMany2OneId, isOdooIdempotencyError, resolveIdempotentOrderMatch } from '@/lib/b2bIdempotency';
+import { verifySameOrigin, rateLimit, clientIp, previewMutationBlocked, PREVIEW_BLOCKED_MESSAGE } from '@/lib/requestGuards';
 import { cookies } from 'next/headers';
 import { randomUUID, createHash } from 'crypto';
 
@@ -102,6 +103,18 @@ export async function POST(request: Request) {
     const payload = await verifyToken(sessionCookie);
     if (!payload?.partner_id || !payload.b2b) return NextResponse.json({ error: 'Sesión inválida' }, { status: 401 });
 
+    // ── Guardrails de mutación (CSRF-equivalente, rate limit, preview guard) ──
+    if (!verifySameOrigin(request)) {
+      return NextResponse.json({ error: 'Solicitud no permitida.' }, { status: 403 });
+    }
+    if (!rateLimit(`orders-create:${payload.partner_id}:${clientIp(request)}`, 5, 60_000)) {
+      return NextResponse.json({ error: 'Demasiados intentos. Espera un momento e intenta de nuevo.' }, { status: 429 });
+    }
+    if (previewMutationBlocked(payload.partner_id as number)) {
+      console.warn('[B2B_ORDER] mutación bloqueada en preview', { partner_id: payload.partner_id });
+      return NextResponse.json({ error: PREVIEW_BLOCKED_MESSAGE }, { status: 403 });
+    }
+
     const body = await request.json();
     const { cart_lines, delivery_date, delivery_schedule, payment_method, notes } = body;
     const clientIdempotencyKey: string | undefined = body?.idempotency_key;
@@ -137,6 +150,13 @@ export async function POST(request: Request) {
     });
     if (!partnerData.length) return NextResponse.json({ error: 'Cuenta no encontrada' }, { status: 404 });
     const partner = partnerData[0];
+
+    // ── Política de pago: crédito solo con crédito AUTORIZADO ──────────────
+    // La UI ya oculta la opción si credit_limit <= 0; el server la revalida
+    // porque el request puede venir manipulado.
+    if (payment_method === 'credito' && !(partner.credit_limit > 0)) {
+      return NextResponse.json({ error: 'Tu cuenta no tiene crédito autorizado. Elige otro método de pago.' }, { status: 400 });
+    }
 
     // ── 2. Idempotency: derivar key estable si cliente no la mandó ─────────
     // Hash del cart + partner + delivery_date. Garantiza que el mismo carrito
@@ -332,11 +352,13 @@ export async function POST(request: Request) {
     // válidos, NO mandamos tax_id → Odoo decide según su configuración fiscal real.
     const allTaxIds = Array.from(new Set(Object.values(productInfo).flatMap((p) => p.taxes_id)));
     const taxCompanyMap: Record<number, number | false> = {};
+    const taxAmountMap: Record<number, number> = {};
     if (allTaxIds.length) {
       try {
-        const taxRows = await callKw('account.tax', 'read', [allTaxIds], { fields: ['id', 'company_id'] });
+        const taxRows = await callKw('account.tax', 'read', [allTaxIds], { fields: ['id', 'company_id', 'amount'] });
         for (const t of taxRows) {
           taxCompanyMap[t.id] = t.company_id ? t.company_id[0] : false;
+          taxAmountMap[t.id] = t.amount || 0;
         }
       } catch (taxErr: any) {
         console.warn('[B2B_ORDER] no se pudo leer compañías de impuestos', { err: taxErr?.message });
@@ -377,15 +399,19 @@ export async function POST(request: Request) {
       return [0, 0, lineVals];
     });
 
-    const subtotal = cart_lines.reduce((tot: number, item: any) => {
+    // ── Total ESTIMADO con los impuestos REALES del producto (nunca 16% fijo:
+    // los productos GF llevan IVA 0% y el hardcode inflaba el total un 16%).
+    // Es solo un pre-estimado de respaldo: la cifra que manda es amount_total
+    // de Odoo, releída tras el create (paso 8).
+    const estimatedTotal = Math.round(cart_lines.reduce((tot: number, item: any) => {
       const resolved = pricelistMap[item.product_id];
       const sp = resolved ? resolved.price : productInfo[item.product_id].fallback_price;
-      return tot + sp * item.qty;
-    }, 0);
-    const total_con_iva = Math.round(subtotal * 1.16 * 100) / 100;
+      const rate = (validTaxIdsByProduct[item.product_id] || [])
+        .reduce((acc: number, tid: number) => acc + (taxAmountMap[tid] || 0), 0);
+      return tot + sp * item.qty * (1 + rate / 100);
+    }, 0) * 100) / 100;
 
     const credito_disponible = partner.credit_limit - partner.credit;
-    const supera_credito = total_con_iva > credito_disponible;
 
     // ── 6. Multi-company context ──────────────────────────────────────────
     const companyContext = { context: { allowed_company_ids: [companyId] } };
@@ -499,6 +525,12 @@ export async function POST(request: Request) {
       });
     }
 
+    // ── Total REAL del pedido (fuente de verdad: Odoo). El check de crédito,
+    // la autoconfirmación y la respuesta usan amount_total persistido; solo si
+    // la relectura falló se usa el estimado con impuestos reales.
+    const totalReal = typeof persisted?.amount_total === 'number' ? persisted.amount_total : estimatedTotal;
+    const supera_credito = totalReal > credito_disponible;
+
     // ── 9. Confirmación automática (si aplica) ───────────────────────────
     let finalStatus = 'draft';
     if (partner.credit_limit > 0 && !supera_credito && payment_method === 'credito') {
@@ -523,7 +555,7 @@ export async function POST(request: Request) {
             order_name: orderName,
             partner_name: partner.name,
             partner_id: partnerId,
-            total: persisted?.amount_total ?? total_con_iva,
+            total: totalReal,
             supera_credito,
             ejecutivo_id: partner.user_id ? partner.user_id[0] : null,
             canal: 'pwa_canal_tradicional',
@@ -541,7 +573,7 @@ export async function POST(request: Request) {
       order_name: orderName,
       partner_id: partnerId,
       n_lines: persistedLines.length || cart_lines.length,
-      amount_total: persisted?.amount_total ?? total_con_iva,
+      amount_total: totalReal,
       pricelist_id: pricelistId,
       status: finalStatus,
       idempotent: false,
@@ -551,7 +583,7 @@ export async function POST(request: Request) {
       order_id: orderId,
       order_name: orderName,
       status: finalStatus,
-      total_con_iva: persisted?.amount_total ?? total_con_iva,
+      total_con_iva: totalReal,
       amount_untaxed: persisted?.amount_untaxed,
       amount_tax: persisted?.amount_tax,
       credito_disponible: credito_disponible,

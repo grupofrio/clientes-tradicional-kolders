@@ -2,9 +2,18 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { verifyN8nMagicLink } from "@/lib/n8nAuth";
 import { signToken } from "@/lib/auth";
+import { verifySameOrigin, rateLimit, clientIp } from "@/lib/requestGuards";
 
 export async function POST(request: Request) {
   try {
+    if (!verifySameOrigin(request)) {
+      return NextResponse.json({ error: "Solicitud no permitida." }, { status: 403 });
+    }
+    // Barrera mínima contra fuerza bruta de tokens (el límite fuerte vive en n8n).
+    if (!rateLimit(`auth-verify:${clientIp(request)}`, 10, 5 * 60_000)) {
+      return NextResponse.json({ error: "Demasiados intentos. Espera unos minutos e intenta de nuevo." }, { status: 429 });
+    }
+
     const { token, phone } = await request.json();
     if (!token || typeof token !== "string") {
       return NextResponse.json({ error: "Token missing" }, { status: 400 });

@@ -13,10 +13,10 @@ export default function AccountPage() {
   const [loading, setLoading] = useState(true);
   const [overdueInvoices, setOverdueInvoices] = useState(0);
 
-  useEffect(() => {
+  const fetchAccount = () => {
     Promise.all([
         fetch('/api/account/profile').then(res => res.ok ? res.json() : null),
-        fetch('/api/b2b/invoices').then(res => res.ok ? res.json() : [])
+        fetch('/api/b2b/invoices').then(res => res.ok ? res.json() : []).catch(() => [])
     ]).then(([profileData, invData]) => {
         if (profileData && !profileData.error) setPartner(profileData);
         if (Array.isArray(invData)) {
@@ -27,7 +27,16 @@ export default function AccountPage() {
     }).catch(() => {
         setLoading(false);
     });
+  };
+
+  useEffect(() => {
+    fetchAccount();
   }, []);
+
+  const retryAccount = () => {
+    setLoading(true);
+    fetchAccount();
+  };
 
   const handleLogout = async () => {
     try {
@@ -37,14 +46,43 @@ export default function AccountPage() {
     router.replace("/");
   };
 
+  // Sin número real no se abre nada: cero fallbacks inventados.
+  const executiveWa = partner?.executive_phone || process.env.NEXT_PUBLIC_WA_SALES || null;
   const contactExecutive = () => {
-      if(!partner) return;
-      const waNumber = partner.executive_phone || process.env.NEXT_PUBLIC_WA_SALES || '5218110000000';
-      window.open(`https://wa.me/${waNumber}?text=${encodeURIComponent(`Hola, soy ${partner.name}. `)}`, '_blank');
+      if (!partner || !executiveWa) return;
+      window.open(`https://wa.me/${executiveWa}?text=${encodeURIComponent(`Hola, soy ${partner.name}. `)}`, '_blank');
   }
 
   if (loading) {
     return <div className="min-h-[50vh] flex justify-center items-center"><Loader2 className="animate-spin text-primary" /></div>;
+  }
+
+  // El perfil no cargó (red débil / error del servidor): pantalla de error
+  // con salida, nunca pantalla blanca.
+  if (!partner) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6">
+        <div className="bg-card w-full max-w-sm rounded-2xl p-8 border border-border text-center shadow-sm">
+          <div className="w-14 h-14 bg-warning/10 text-warning rounded-full flex items-center justify-center mx-auto mb-4">
+            <AlertTriangle size={26} />
+          </div>
+          <h1 className="text-lg font-black text-foreground mb-1">No pudimos cargar tu cuenta</h1>
+          <p className="text-sm text-muted-foreground mb-6">Revisa tu conexión e intenta de nuevo.</p>
+          <button
+            onClick={retryAccount}
+            className="w-full bg-primary text-white font-bold h-12 rounded-xl mb-3"
+          >
+            Reintentar
+          </button>
+          <button
+            onClick={handleLogout}
+            className="w-full flex items-center justify-center gap-2 h-12 rounded-xl border border-border text-danger font-bold text-sm"
+          >
+            <LogOut size={16} /> Cerrar sesión
+          </button>
+        </div>
+      </div>
+    );
   }
 
   const credito_disp = partner.credit_limit - partner.credit_used;
@@ -109,12 +147,14 @@ export default function AccountPage() {
             <p className="text-[9px] text-muted-foreground font-black uppercase tracking-wider">Ejecutivo de Cuenta</p>
             <p className="font-bold text-foreground text-sm mt-0.5">{partner.executive}</p>
           </div>
-          <button
-            onClick={contactExecutive}
-            className="bg-success text-white px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-md"
-          >
-            <Phone size={13} /> WhatsApp
-          </button>
+          {executiveWa && (
+            <button
+              onClick={contactExecutive}
+              className="bg-success text-white px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-md"
+            >
+              <Phone size={13} /> WhatsApp
+            </button>
+          )}
         </div>
 
         {/* Nav menu */}

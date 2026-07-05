@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { callKw } from '@/lib/odoo';
 import { verifyToken } from '@/lib/auth';
 import { resolvePricesForPartner } from '@/lib/pricelist';
+import { verifySameOrigin, rateLimit, clientIp } from '@/lib/requestGuards';
 import { cookies } from 'next/headers';
 
 export async function POST(request: Request) {
@@ -11,6 +12,13 @@ export async function POST(request: Request) {
 
     const payload = await verifyToken(sessionCookie);
     if (!payload?.partner_id || !payload.b2b) return NextResponse.json({ error: 'Sesión inválida' }, { status: 401 });
+
+    if (!verifySameOrigin(request)) {
+      return NextResponse.json({ error: 'Solicitud no permitida.' }, { status: 403 });
+    }
+    if (!rateLimit(`cart-validate:${payload.partner_id}:${clientIp(request)}`, 30, 60_000)) {
+      return NextResponse.json({ error: 'Demasiados intentos. Espera un momento e intenta de nuevo.' }, { status: 429 });
+    }
 
     const { cart_lines } = await request.json();
 

@@ -1,8 +1,12 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
+import { verifySameOrigin } from '@/lib/requestGuards';
 
-export async function POST() {
+export async function POST(request: Request) {
   try {
+    if (!verifySameOrigin(request)) {
+      return NextResponse.json({ error: 'Solicitud no permitida.' }, { status: 403 });
+    }
     const cookieStore = await cookies();
     cookieStore.delete('session');
     cookieStore.delete('otp_session');

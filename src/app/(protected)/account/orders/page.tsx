@@ -8,11 +8,13 @@ export default function OrderHistory() {
   const router = useRouter();
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [reorderingId, setReorderingId] = useState<number | null>(null);
 
   const addItem = useB2BCartStore(state => state.addItem);
 
-  useEffect(() => {
+  const fetchOrders = () => {
     fetch('/api/b2b/orders/history')
       .then(res => {
         if (!res.ok) throw new Error('Error del servidor');
@@ -20,26 +22,74 @@ export default function OrderHistory() {
       })
       .then(data => {
         if (Array.isArray(data)) setOrders(data);
+        else setLoadError(true);
         setLoading(false);
       })
       .catch(() => {
+        setLoadError(true);
         setLoading(false);
       });
+  };
+
+  useEffect(() => {
+    fetchOrders();
   }, []);
 
-  const handleReorder = (order: any) => {
-     order.lines.forEach((line: any) => {
-         addItem({
-             product_id: line.product_id,
-             name: line.name.split('\n')[0],
-             sku: '',
-             price: line.price,
-             uom_name: line.uom,
-             qty: line.qty,
-             qtyPerPage: 1
-         });
-     });
-     router.push("/cart");
+  const retryOrders = () => {
+    setLoading(true);
+    setLoadError(false);
+    fetchOrders();
+  };
+
+  // Reordenar rehidrata cada línea desde el catálogo actual (precio, SKU,
+  // tax_rate y empaque vigentes) en lugar de copiar datos históricos del
+  // pedido. Productos que ya no existen o no están disponibles se omiten
+  // avisando al cliente — nunca se agregan líneas rotas al carrito.
+  const handleReorder = async (order: any) => {
+     if (reorderingId !== null) return;
+     setReorderingId(order.id);
+     try {
+        const res = await fetch('/api/catalog');
+        if (!res.ok) throw new Error('catalog');
+        const catalog = await res.json();
+        if (!Array.isArray(catalog)) throw new Error('catalog');
+
+        const byId = new Map<number, any>(catalog.map((c: any) => [c.id, c]));
+        const omitted: string[] = [];
+        let added = 0;
+
+        (order.lines || []).forEach((line: any) => {
+            const item = byId.get(line.product_id);
+            if (!item) {
+                omitted.push(line.name.split('\n')[0]);
+                return;
+            }
+            addItem({
+                product_id: item.id,
+                name: item.name,
+                sku: item.sku || '',
+                price: item.price,
+                tax_rate: item.tax_rate || 0,
+                uom_name: item.uom,
+                qty: line.qty,
+                qtyPerPage: item.boxSize || 1,
+            });
+            added++;
+        });
+
+        if (omitted.length > 0) {
+            alert(`Estos productos ya no están disponibles y no se agregaron:\n- ${omitted.join('\n- ')}`);
+        }
+        if (added > 0) {
+            router.push("/cart");
+        } else if (omitted.length === 0) {
+            alert('Este pedido no tiene productos para reordenar.');
+        }
+     } catch {
+        alert('No se pudo preparar el pedido. Revisa tu conexión e intenta de nuevo.');
+     } finally {
+        setReorderingId(null);
+     }
   };
 
   const getStatusBadge = (state: string) => {
@@ -78,6 +128,14 @@ export default function OrderHistory() {
         {loading ? (
           <div className="flex justify-center p-10">
             <Loader2 className="animate-spin text-primary w-8 h-8" />
+          </div>
+        ) : loadError ? (
+          <div className="text-center p-10 bg-card border border-danger/20 rounded-2xl">
+            <p className="font-bold text-danger mb-1">No pudimos cargar tus pedidos</p>
+            <p className="text-muted-foreground text-sm mb-4">Revisa tu conexión e intenta de nuevo.</p>
+            <button onClick={retryOrders} className="text-primary text-sm font-bold underline">
+              Reintentar
+            </button>
           </div>
         ) : orders.length === 0 ? (
           <div className="text-center p-10 bg-card border border-border rounded-2xl">
@@ -128,9 +186,12 @@ export default function OrderHistory() {
                 </button>
                 <button
                   onClick={() => handleReorder(order)}
-                  className="flex-1 bg-primary/10 text-primary border border-primary/20 text-xs font-bold py-2.5 rounded-xl flex items-center justify-center gap-1.5 hover:bg-primary hover:text-white transition-all"
+                  disabled={reorderingId !== null}
+                  className="flex-1 bg-primary/10 text-primary border border-primary/20 text-xs font-bold py-2.5 rounded-xl flex items-center justify-center gap-1.5 hover:bg-primary hover:text-white transition-all disabled:opacity-50"
                 >
-                  <RefreshCw size={13} /> Reordenar
+                  {reorderingId === order.id
+                    ? <Loader2 size={13} className="animate-spin" />
+                    : <RefreshCw size={13} />} Reordenar
                 </button>
               </div>
             </div>
