@@ -154,11 +154,18 @@ export default function Catalog() {
       {/* Header */}
       <div className="bg-gradient-to-br from-[#005A8D] to-[#00B8D4] pt-10 pb-4 px-4 shadow-lg">
         <div className="flex justify-between items-start mb-3">
-          <div className="min-w-0 flex-1">
-            <p className="text-white/70 text-[9px] font-bold tracking-[0.15em] uppercase mb-0.5">Portal de Clientes Grupo Frío</p>
-            <h1 className="text-white text-lg font-black tracking-tight truncate">
-              {partner?.name ? `Hola, ${partner.name}` : 'Bienvenido'}
-            </h1>
+          <div className="min-w-0 flex-1 flex items-center gap-2.5">
+            {/* Mark oficial GF en chip blanco — el logo completo vive en la portada */}
+            <div className="w-9 h-9 bg-white rounded-xl flex-shrink-0 flex items-center justify-center shadow-sm">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/brand/grupo-frio-logo-mark.png" alt="Grupo Frío" width={26} height={26} />
+            </div>
+            <div className="min-w-0">
+              <p className="text-white/70 text-[9px] font-bold tracking-[0.15em] uppercase mb-0.5">Portal de Clientes Grupo Frío</p>
+              <h1 className="text-white text-lg font-black tracking-tight truncate">
+                {partner?.name ? `Hola, ${partner.name}` : 'Bienvenido'}
+              </h1>
+            </div>
           </div>
           {/* Bloque financiero SOLO para clientes con crédito autorizado.
               Al cliente de contado no se le muestra "$0.00 disponible". */}

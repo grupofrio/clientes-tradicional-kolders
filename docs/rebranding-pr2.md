@@ -13,10 +13,13 @@
 - Eliminados de la UI: KOLDOS, Portal Distribuidores, Distribuidor, Enlace KOLD, KOLD Canal Tradicional, Procesar Orden B2B, Auditoría de Pedidos, Token (visible).
 - Teaser de recompensas (sin datos falsos): "Muy pronto tus compras sumarán puntos y recompensas Grupo Frío."
 
-## Pendiente de diseño (no bloquea)
+## Assets de marca oficiales (integrados)
 
-- **Logo oficial Grupo Frío como asset local** (`public/logo-gf.svg|png`). Mientras tanto la portada usa un wordmark tipográfico + copo, y los íconos PWA (`public/icon-192/512.png`) son un placeholder generado con el gradiente institucional y monograma GF. Al recibir el asset oficial: reemplazar íconos, favicon y la marca de la portada.
-- `src/app/favicon.ico` sigue siendo el anterior — reemplazar junto con el logo oficial.
+- `public/brand/grupo-frio-logo.png` — logo horizontal oficial (453×243, fondo transparente). Fuente: logo corporativo de la compañía en Odoo (`res.company` 34, idéntico al asset que sirve grupofrio.mx), obtenido por lectura; recortado al contenido sin redibujar nada.
+- `public/brand/grupo-frio-logo-mark.png` — mark cuadrado (solo el cubo isométrico, 231×231, transparente), extraído por recorte del logo oficial. Se usa en el chip del header del catálogo; el logo completo vive en la portada.
+- `public/icon-192.png` / `public/icon-512.png` — íconos PWA regenerados: mark oficial centrado al 62% sobre fondo blanco (zona segura maskable).
+- `src/app/favicon.ico` — regenerado desde el mark oficial (16/32/48 px).
+- El copo/monograma placeholder quedó eliminado de la UI. Único punto pendiente de diseño: si la dirección de marca prefiere el logo sobre fondo distinto al blanco en los íconos, es cambio de 1 script.
 
 ## Copy sugerido para el bot de WhatsApp (n8n) — NO aplicado en este PR
 

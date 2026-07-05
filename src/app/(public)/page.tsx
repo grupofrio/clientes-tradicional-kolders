@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import Image from "next/image";
 import { ShoppingCart, ClipboardList, Star, Gift, Lock } from "lucide-react";
 
 // Número del bot de servicio Grupo Frío (WhatsApp). Configurable por env;
@@ -24,19 +25,19 @@ export default async function Home() {
     <main className="min-h-screen bg-gradient-to-br from-[#F0F9FF] via-[#E0F3FC] to-[#C9EBF8] flex flex-col relative px-6 py-10">
       <div className="flex-1 flex flex-col justify-center max-w-sm mx-auto w-full z-10">
 
-        {/* Marca — wordmark temporal mientras se sube el asset oficial del logo */}
-        <div className="mb-8 text-center">
-          <div className="w-20 h-20 bg-white rounded-3xl flex items-center justify-center mx-auto mb-5 shadow-lg shadow-[#0077BB]/15 border border-[#DBEFF9]">
-            <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="#0077BB" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <line x1="12" y1="2" x2="12" y2="22" />
-              <line x1="2" y1="12" x2="22" y2="12" />
-              <line x1="4.9" y1="4.9" x2="19.1" y2="19.1" />
-              <line x1="19.1" y1="4.9" x2="4.9" y2="19.1" />
-              <circle cx="12" cy="12" r="3.2" fill="#00B8D4" stroke="none" opacity="0.25" />
-            </svg>
-          </div>
-          <p className="text-[#0077BB] font-black tracking-[0.22em] text-[11px] mb-1 uppercase">Portal de Clientes</p>
-          <h1 className="text-4xl font-black tracking-tight text-[#0F2A3D]">Grupo Frío</h1>
+        {/* Logo oficial Grupo Frío (el wordmark viene incluido en el asset) */}
+        <div className="mb-8 flex flex-col items-center text-center">
+          <Image
+            src="/brand/grupo-frio-logo.png"
+            alt="Grupo Frío"
+            width={453}
+            height={243}
+            priority
+            className="w-[248px] h-auto mb-4 drop-shadow-sm"
+          />
+          <h1 className="text-[#0077BB] font-black tracking-[0.22em] text-[11px] uppercase">
+            Portal de Clientes
+          </h1>
         </div>
 
         {/* Promesa de valor */}
