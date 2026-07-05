@@ -50,7 +50,7 @@ export default function CartPage() {
           <Trash2 size={32} />
         </div>
         <h1 className="text-xl font-black text-foreground mb-2">Tu carrito está vacío</h1>
-        <p className="text-sm text-muted-foreground mb-8">Agrega productos desde el catálogo B2B.</p>
+        <p className="text-sm text-muted-foreground mb-8">Agrega productos para tu tienda desde el catálogo.</p>
         <Link href="/catalog" className="bg-gradient-to-r from-primary to-accent text-white font-bold px-8 py-4 rounded-2xl shadow-lg shadow-primary/25">
           Ir al Catálogo
         </Link>
@@ -128,7 +128,7 @@ export default function CartPage() {
   return (
     <div className="min-h-screen bg-background pb-36">
       {/* Header */}
-      <div className="bg-gradient-to-br from-[#1E3A8A] to-[#2563EB] pt-10 pb-4 px-4 shadow-lg">
+      <div className="bg-gradient-to-br from-[#005A8D] to-[#00B8D4] pt-10 pb-4 px-4 shadow-lg">
         <div className="flex items-center gap-3">
           <button
             onClick={() => router.back()}
@@ -136,7 +136,7 @@ export default function CartPage() {
           >
             <ArrowLeft size={18} />
           </button>
-          <h1 className="text-white text-lg font-black">Tu Pedido</h1>
+          <h1 className="text-white text-lg font-black">Tu pedido</h1>
           <div className="ml-auto">
             <button
               onClick={clearCart}
@@ -187,7 +187,7 @@ export default function CartPage() {
 
         {/* Delivery details */}
         <div className="bg-card border border-border rounded-2xl p-4 shadow-sm space-y-4">
-          <h3 className="font-black text-foreground text-sm">Logística de Entrega</h3>
+          <h3 className="font-black text-foreground text-sm">Entrega</h3>
           <div className="space-y-1">
             <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Dirección de Entrega</label>
             <div className="w-full h-11 bg-secondary rounded-xl px-3 flex items-center text-sm border border-border">
@@ -234,7 +234,7 @@ export default function CartPage() {
 
         {/* Totals + payment */}
         <div className="bg-card border border-border rounded-2xl p-4 shadow-sm space-y-4">
-          <h3 className="font-black text-foreground text-sm">Términos Comerciales</h3>
+          <h3 className="font-black text-foreground text-sm">Resumen de tu pedido</h3>
           <div className="bg-secondary rounded-xl p-4 space-y-2 border border-border">
             <div className="flex justify-between text-sm font-medium">
               <span className="text-muted-foreground">Subtotal (sin IVA)</span>
@@ -294,7 +294,7 @@ export default function CartPage() {
             disabled={checkoutLoading || loadingProfile}
             className="w-full h-14 rounded-2xl bg-gradient-to-r from-primary to-accent text-white font-black tracking-wide transition-all disabled:opacity-50 flex items-center justify-center shadow-lg shadow-primary/25"
           >
-            {checkoutLoading ? <Loader2 className="animate-spin w-5 h-5" /> : "Procesar Orden B2B"}
+            {checkoutLoading ? <Loader2 className="animate-spin w-5 h-5" /> : "Confirmar pedido"}
           </button>
         </div>
       </div>

@@ -1,11 +1,11 @@
 {
-  "name": "KOLD Distribuidores",
-  "short_name": "KOLD B2B",
-  "description": "Plataforma de abastecimiento y gestión para Canal Tradicional KOLD",
+  "name": "Portal de Clientes Grupo Frío",
+  "short_name": "Grupo Frío",
+  "description": "Haz tus pedidos, consulta tus compras y gana recompensas con Grupo Frío.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#F8FAFC",
-  "theme_color": "#0066FF",
+  "background_color": "#F0F9FF",
+  "theme_color": "#0077BB",
   "icons": [
     {
       "src": "/icon-192.png",

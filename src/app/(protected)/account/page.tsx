@@ -91,7 +91,7 @@ export default function AccountPage() {
   return (
     <div className="min-h-screen bg-background pb-32">
       {/* Header with avatar */}
-      <div className="bg-gradient-to-br from-[#1E3A8A] to-[#2563EB] pt-12 pb-16 px-6 text-center rounded-b-3xl shadow-lg">
+      <div className="bg-gradient-to-br from-[#005A8D] to-[#00B8D4] pt-12 pb-16 px-6 text-center rounded-b-3xl shadow-lg">
         <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-3 border-2 border-white/30">
           <span className="text-white text-2xl font-black">
             {partner.name?.charAt(0).toUpperCase() || '?'}
@@ -104,7 +104,7 @@ export default function AccountPage() {
       <div className="px-4 -mt-10 space-y-3 relative z-10">
         {/* Credit card */}
         <div className="bg-card rounded-2xl p-5 shadow-lg border border-border">
-          <h2 className="font-black text-foreground text-sm mb-4">Línea de Crédito Comercial</h2>
+          <h2 className="font-black text-foreground text-sm mb-4">Tu línea de crédito</h2>
           <div className="flex justify-between items-end mb-3">
             <div>
               <p className="text-[9px] text-muted-foreground uppercase font-bold tracking-wider mb-0.5">Disponible</p>
@@ -144,7 +144,7 @@ export default function AccountPage() {
         {/* Executive contact */}
         <div className="bg-card rounded-2xl p-4 shadow-sm border border-border flex justify-between items-center">
           <div>
-            <p className="text-[9px] text-muted-foreground font-black uppercase tracking-wider">Ejecutivo de Cuenta</p>
+            <p className="text-[9px] text-muted-foreground font-black uppercase tracking-wider">Tu asesor Grupo Frío</p>
             <p className="font-bold text-foreground text-sm mt-0.5">{partner.executive}</p>
           </div>
           {executiveWa && (
@@ -164,8 +164,8 @@ export default function AccountPage() {
               <ClipboardList size={18} />
             </div>
             <div className="flex-1">
-              <h3 className="font-bold text-foreground text-sm">Auditoría de Pedidos</h3>
-              <p className="text-[10px] text-muted-foreground">Revisar compras y reordenar stock</p>
+              <h3 className="font-bold text-foreground text-sm">Mis pedidos</h3>
+              <p className="text-[10px] text-muted-foreground">Revisa tus compras y repite pedidos</p>
             </div>
             <span className="text-muted-foreground text-sm">›</span>
           </Link>
@@ -177,8 +177,8 @@ export default function AccountPage() {
               )}
             </div>
             <div className="flex-1">
-              <h3 className="font-bold text-foreground text-sm">Facturación y Pagos</h3>
-              <p className="text-[10px] text-muted-foreground">Revisión de saldos y PDF</p>
+              <h3 className="font-bold text-foreground text-sm">Mis pagos</h3>
+              <p className="text-[10px] text-muted-foreground">Consulta tus saldos y facturas</p>
             </div>
             <span className="text-muted-foreground text-sm">›</span>
           </Link>
@@ -187,8 +187,8 @@ export default function AccountPage() {
               <Package size={18} />
             </div>
             <div className="flex-1">
-              <h3 className="font-bold text-foreground text-sm">Catálogo de Productos</h3>
-              <p className="text-[10px] text-muted-foreground">Hacer un nuevo pedido</p>
+              <h3 className="font-bold text-foreground text-sm">Catálogo Grupo Frío</h3>
+              <p className="text-[10px] text-muted-foreground">Haz un nuevo pedido para tu tienda</p>
             </div>
             <span className="text-muted-foreground text-sm">›</span>
           </Link>
@@ -198,7 +198,7 @@ export default function AccountPage() {
           onClick={handleLogout}
           className="w-full flex items-center justify-center gap-2 p-4 bg-card rounded-2xl border border-border text-danger font-bold text-sm active:bg-danger/5 transition-colors shadow-sm"
         >
-          <LogOut size={17} /> Cerrar Sesión
+          <LogOut size={17} /> Cerrar sesión
         </button>
       </div>
     </div>

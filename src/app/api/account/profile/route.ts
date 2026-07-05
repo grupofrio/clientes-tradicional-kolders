@@ -66,7 +66,7 @@ export async function GET() {
       pricelist: partner.property_product_pricelist ? { id: partner.property_product_pricelist[0], name: partner.property_product_pricelist[1] } : null,
       credit_limit: partner.credit_limit || 0,
       credit_used: partner.credit || 0,
-      executive: partner.user_id ? partner.user_id[1] : 'Ejecutivo KOLD',
+      executive: partner.user_id ? partner.user_id[1] : 'Asesor Grupo Frío',
       executive_phone: executivePhone,
       payment_term: partner.property_payment_term_id ? { id: partner.property_payment_term_id[0], name: partner.property_payment_term_id[1] } : null
     });
