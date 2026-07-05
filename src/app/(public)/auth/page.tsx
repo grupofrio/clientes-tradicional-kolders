@@ -132,7 +132,7 @@ function AuthContent() {
         if (status !== 200 || data.error) {
           setError(data.error || "Error validando credenciales");
         } else {
-          router.replace("/catalog");
+          router.replace("/home");
         }
       })
       .catch(() => setError("Error de conexión al servidor"));

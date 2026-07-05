@@ -1,6 +1,6 @@
 "use client";
 import { useB2BCartStore } from "@/store/cart";
-import { Package, ShoppingCart, User, ClipboardList } from "lucide-react";
+import { Home, Package, ShoppingCart, User, ClipboardList } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -35,6 +35,7 @@ export default function BottomNav() {
   }, []);
 
   const navItems = [
+    { name: "Inicio", href: "/home", icon: Home },
     { name: "Catálogo", href: "/catalog", icon: Package },
     { name: "Carrito", href: "/cart", icon: ShoppingCart, badge: mounted ? totalItems : 0 },
     { name: "Pedidos", href: "/account/orders", icon: ClipboardList },

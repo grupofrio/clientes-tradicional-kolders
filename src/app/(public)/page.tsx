@@ -16,10 +16,9 @@ const BULLETS = [
 ];
 
 export default async function Home() {
-  // Cliente con sesión activa → directo a pedir, sin pasar por la portada.
-  // (El destino será /home cuando exista; por ahora /catalog es la ruta estable.)
+  // Cliente con sesión activa → directo a su inicio, sin pasar por la portada.
   const session = (await cookies()).get("session")?.value;
-  if (session) redirect("/catalog");
+  if (session) redirect("/home");
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-[#F0F9FF] via-[#E0F3FC] to-[#C9EBF8] flex flex-col relative px-6 py-10">
