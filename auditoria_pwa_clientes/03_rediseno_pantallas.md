@@ -130,7 +130,7 @@ Formato: objetivo · estructura · copy/CTAs · estados · datos backend · qué
   4. *"¿Cómo gano puntos?"*: *"Cada compra con Grupo Frío suma puntos. Acumúlalos y cámbialos por beneficios para tu tienda."* + regla concreta desde Odoo ("$1 = X pts" / "cada bolsa = X pts") + momento de abono + expiración si aplica (*"Tus puntos vencen el DD/MM"* — solo si el programa expira).
   5. **Catálogo de recompensas:** grid con TODAS — disponibles (color, botón `Canjear`) y **bloqueadas** (gris, candado suave, *"Te faltan 460 pts"* + mini barra). Ver lo que casi alcanzas es el motor psicológico del programa.
   6. **Historial de movimientos:** `+120 · Pedido S00123 · 2 jul` / `−1,500 · Canje: Bolsa Rolito · folio R-00045` / `−200 · Puntos vencidos` .
-  7. Reglas claras (link "Ver reglas del programa": acumulación, expiración, entrega de recompensas, qué pasa si se cancela un pedido).
+  7. Reglas claras (link "Ver reglas del programa"): acumulación y momento de abono, **máximo 1 canje al mes**, expiración si aplica, cómo se entregan las recompensas (con tu siguiente pedido o como descuento), y qué pasa si se cancela un pedido (los puntos de ese pedido se revierten).
 - **CTA principal:** `Canjear` (por recompensa). **Secundario:** `Hacer un pedido para sumar puntos` → catálogo.
 - **Estados:** loading = skeleton saldo+grid; empty (0 pts, sin historial) = *"Haz tu primer pedido y empieza a sumar puntos"*; error = *"No pudimos cargar tus puntos. No te preocupes: tus puntos están seguros."* + reintentar; `teaser` = pantalla de lanzamiento próximo con las reglas del programa.
 - **Backend:** `GET /api/rewards/summary` + `/catalog` + `/history` (🆕, spec en doc 01 §3.2).
@@ -143,17 +143,18 @@ Formato: objetivo · estructura · copy/CTAs · estados · datos backend · qué
   1. **Detalle:** imagen + nombre + descripción + **⭐ 1,500 pts** + disponibilidad + *"Te quedarían 240 pts"* → `Canjear ahora`.
   2. **Confirmación (bottom sheet):** *"¿Confirmas tu canje? Vas a usar 1,500 puntos por: Bolsa Rolito 5kg gratis."* → `Sí, canjear` / `Todavía no`. (Doble toque intencional: es la única fricción permitida.)
   3. **Validación automática** — `POST /api/rewards/redeem` con `idempotency_key`; Odoo valida saldo + disponibilidad + bloqueos, **descuenta puntos y registra el canje en una sola transacción** (método atómico, doc 01 pregunta 19).
-  4. **Éxito:** check animado breve + **folio `R-00045`** + nuevo saldo + **instrucciones de entrega** según modo: *"Tu recompensa llega con tu próximo pedido"* / *"Tu ruta te la entrega en tu próxima visita"* / *"Se aplicará como descuento en tu siguiente factura"*.
-  5. El canje aparece en historial como **"Pendiente de entrega"** hasta que operación lo marque entregado.
-- **Estados de error (contrato completo):**
+  4. **Éxito:** check animado breve + **folio `R-00045`** + nuevo saldo + **instrucciones de entrega** según `delivery_mode` (solo dos modos iniciales, DECIDIDO): *"Tu recompensa llega con tu siguiente pedido"* / *"Se aplicará como descuento en tu siguiente pedido/factura"*. (La entrega independiente en ruta queda fuera de la fase inicial.)
+  5. El canje aparece en historial como **"Pendiente de entrega"** (producto) o **"Pendiente de aplicarse"** (descuento) hasta que operación lo marque cumplido en Odoo.
+- **Estados de error (contrato completo, alineado a las reglas decididas):**
   - **Puntos insuficientes** (el saldo cambió): *"Te faltan X puntos para esta recompensa."* + saldo actualizado.
   - **Recompensa agotada:** *"Esta recompensa se agotó. Mira otras disponibles."* + volver al catálogo.
-  - **Cliente bloqueado** (si negocio adopta la regla de saldo vencido): *"Para canjear, primero ponte al corriente con tus pagos."* + link a Mis pagos.
+  - **Límite mensual alcanzado** (`monthly_limit_reached` — máx. 1 canje/mes, validado en Odoo): *"Ya usaste tu canje de este mes. Podrás canjear otra recompensa el próximo mes."* + fecha en que puede volver a canjear si Odoo la devuelve.
   - **Error Odoo/red:** *"No se pudo completar el canje. **No se descontaron puntos.** Intenta de nuevo."* + reintentar (el reintento manda la MISMA idempotency_key → si el canje sí entró, recibe el folio original, no un doble canje).
   - **Replay/duplicado:** transparente — se muestra el folio original como éxito.
-- **Notificación a operación:** cada canje dispara webhook n8n (patrón idéntico a `N8N_WEBHOOK_ORDERS`) → el ejecutivo/ruta lo ve y ejecuta la entrega. El asesor NO aprueba — solo entrega.
+  - *(Estado FUTURO, no inicial — decisión Yamil: el bloqueo por saldo vencido está desactivado en el piloto. La UI NO muestra mensajes de bloqueo por pagos; solo si algún día Odoo devuelve explícitamente `customer_blocked`, se mostraría: "Para canjear, primero ponte al corriente con tus pagos." + link a Mis pagos.)*
+- **Notificación a operación:** cada canje dispara webhook n8n (patrón idéntico a `N8N_WEBHOOK_ORDERS`) → el ejecutivo lo ve y **ejecuta** la entrega con el siguiente pedido o la aplicación del descuento. El asesor NO aprueba — solo entrega/aplica.
 - **Backend:** `POST /api/rewards/redeem` 🆕 + método atómico en Odoo (Sebas) + webhook n8n.
-- **Depende de:** preguntas 14-17 y 19 del cuestionario. **Sin método atómico no se lanza** (fase intermedia admisible en doc 01 §3.4).
+- **Depende de:** las reglas de negocio ya están DECIDIDAS (sin bloqueo por vencidos en piloto, 1 canje/mes, reversa sí, dos modos de entrega); queda la implementación técnica de Sebas: preguntas 14, 16 (mecánica de reversa), 17 y **19 (método atómico)**. **Sin método atómico no se lanza** (fase intermedia admisible en doc 01 §3.4).
 
 ### 9. Estado de cuenta (`/account/invoices` → "Mis pagos", tono suavizado)
 

@@ -15,6 +15,15 @@ Estas decisiones **sustituyen** lo que decía el `AUDIT_REPORT.md` del MVP de ab
 4. **El bot de servicio (55 4000 0990, n8n) es parte de la misma experiencia**, no una herramienta separada. El cliente debe percibir UN solo servicio digital de Grupo Frío.
 5. **Ambición de diseño:** herramienta B2B de primer mundo — institucional + moderna + gamificación ligera; benchmark potencial en la industria de congelados para canal tradicional.
 
+## Reglas de negocio de recompensas confirmadas por Yamil (2026-07-04)
+
+Las 4 reglas de canje que estaban pendientes ya tienen decisión final:
+
+1. **Bloqueo por saldo vencido: NO en fase inicial.** La mayoría del canal tradicional es de contado; no se mete fricción financiera al piloto. `customer_blocked` por vencidos queda **desactivado**; la arquitectura debe permitir activarlo después si Grupo Frío lo decide; la UI no muestra mensajes de bloqueo por pagos vencidos salvo que Odoo devuelva explícitamente una regla futura.
+2. **Límite de canjes: máximo 1 canje al mes por cliente.** Se valida **en Odoo, dentro del método atómico** (nunca en frontend). Si ya canjeó ese mes, el endpoint responde error claro (`monthly_limit_reached`). Copy: *"Ya usaste tu canje de este mes. Podrás canjear otra recompensa el próximo mes."*
+3. **Reversa de puntos: SÍ existe.** Si se cancela el pedido que generó puntos, los puntos se revierten. Recomendación técnica: abonar puntos al **entregar/facturar/confirmar cumplimiento** (no al crear el pedido) para minimizar reversas. Si los puntos ya se usaron en un canje antes de la cancelación, el comportamiento seguro (saldo negativo controlado / ajuste pendiente / bloquear siguientes canjes hasta compensar) **lo propone Sebastián en Odoo**.
+4. **Modos de entrega iniciales: solo dos** — (a) recompensa física/producto gratis: **con el siguiente pedido**; (b) recompensa tipo descuento: **en la siguiente factura/pedido**. La entrega independiente en ruta queda FUERA de la fase inicial. Cada recompensa lleva `delivery_mode`; el folio devuelve instrucciones claras al cliente; operación/asesor **ejecuta** la entrega o aplicación, no aprueba el canje.
+
 ## Documentos
 
 | Doc | Contenido |

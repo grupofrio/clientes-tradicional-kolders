@@ -93,11 +93,13 @@
 
 ## 4. El contrato de canje automático (la pieza técnica central)
 
-**Una sola transacción en Odoo** (método modelo, p.ej. `loyalty.card.gf_redeem(partner_id, reward_id, idempotency_key, channel)`):
-1. Valida: card del partner en el programa B2B, saldo ≥ costo, recompensa activa/con stock, cliente no bloqueado (si la regla se adopta), key no usada.
-2. Descuenta puntos + crea el registro de canje con **folio** + estado `pendiente_entrega`.
-3. Devuelve `{folio, points_spent, new_balance, delivery_mode}`.
+**Una sola transacción en Odoo** (método modelo, p.ej. `loyalty.card.gf_redeem(partner_id, reward_id, idempotency_key, channel)`), implementando las reglas de negocio YA decididas por Yamil (README):
+1. Valida: card del partner en el programa B2B, saldo ≥ costo, recompensa activa/con stock, **límite mensual no excedido (máx. 1 canje/mes — DECIDIDO; se valida AQUÍ, nunca en frontend)**, key no usada. *(El bloqueo por saldo vencido NO se valida en fase inicial — decisión de negocio; el método debe dejar el hook listo para activarlo después sin cambiar el contrato.)*
+2. Descuenta puntos + crea el registro de canje con **folio**, su **`delivery_mode`** (`next_order` = producto gratis con el siguiente pedido | `discount_next_invoice` = descuento en siguiente factura/pedido — únicos dos modos iniciales) y estado `pendiente_entrega` / `pendiente_aplicacion`.
+3. Devuelve `{folio, points_spent, new_balance, delivery_mode}` — o el error tipado: `insufficient_points` | `reward_unavailable` | `monthly_limit_reached`.
 4. Unique constraint sobre la key → un reintento devuelve el canje original (replay), nunca duplica. (Patrón ya probado en este ecosistema con `x_kold_idempotency_key` en `sale.order`.)
+5. **Reversa (DECIDIDO: existe):** si se cancela un pedido que generó puntos, Odoo revierte esos puntos. Mitigación estructural: abonar al entregar/facturar, no al crear. La mecánica del caso "puntos ya gastados en un canje" (saldo negativo controlado / ajuste pendiente / bloquear canjes hasta compensar) **la propone Sebastián** — es parte del mismo dominio Odoo, jamás de la PWA ni de n8n.
+6. **Estado de entrega/aplicación vive en Odoo:** operación marca el canje como entregado/aplicado ahí; PWA y bot solo lo leen.
 
 **Quién lo construye:** Sebastián (territorio Odoo). **Quién lo consume:** PWA (PR 5) y después el bot (fase 2). La PWA/n8n jamás hacen `write` directo sobre `loyalty.card.points`.
 
@@ -109,6 +111,7 @@
 |------|:----:|:---:|:---:|
 | Saldo de puntos, reglas de acumulación, catálogo de recompensas | ✅ dueño | lee | lee |
 | Validación y ejecución de canje (folio) | ✅ dueño | llama (fase 2) | llama |
+| **Límite 1 canje/mes · reversa de puntos · `delivery_mode` · folio · estado de entrega/aplicación** | ✅ dueño (dentro del método atómico) | solo notifica | solo muestra |
 | Precios/pricelists/IVA/crédito/stock | ✅ dueño | lee | lee |
 | Identidad teléfono→partner, tokens de acceso | — | ✅ dueño | consume |
 | Conversación, intents, copy del bot, handover a humano | — | ✅ dueño | deep-linkea |
@@ -131,4 +134,4 @@
 
 1. **Odoo (Sebastián):** ampliar programa loyalty a B2B (cuestionario doc 01 §3.1) + método atómico de canje + permisos del usuario de servicio + (dato) fotos `image_128` de productos.
 2. **n8n (Claude/Yamil):** intents nuevos del bot (portal/pedidos/puntos), reconocimiento del prefijo identificado, webhook de canjes a operación, verificación TTL/un-solo-uso del token W15. n8n productivo es fuente de verdad — cambios con snapshot previo y S/N, como siempre.
-3. **Operación:** definir modo de entrega por recompensa (con el pedido / en visita de ruta / descuento) y quién marca "entregado" en Odoo.
+3. **Operación:** los modos de entrega ya están DECIDIDOS (con el siguiente pedido / descuento en siguiente factura-pedido; entrega independiente en ruta queda fuera de fase inicial). Falta solo definir el procedimiento operativo: quién agrega la línea/descuento al siguiente pedido y quién marca "entregado/aplicado" en Odoo.

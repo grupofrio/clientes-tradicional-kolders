@@ -143,13 +143,13 @@ Nada de esto debe asumirse: **validar contra el Odoo productivo antes de escribi
 10. ¿Qué modelo guarda recompensas y canjes? (nativo: `loyalty.reward` define el premio; el canje se materializa como línea de descuento/producto en una orden con `coupon_id`; el historial en `loyalty.history` si está disponible en la versión, o hay que leer movimientos de otra forma). **Confirmar los modelos exactos y sus permisos.**
 11. ¿Hay expiración de puntos (`expiration_date` en card/programa)? ¿Niveles de cliente? (si no hay niveles nativos, NO inventarlos en frontend).
 
-**D. Reglas de negocio y control**
-12. ¿Bloqueo de canje por saldo vencido (facturas overdue)? — decisión de negocio; técnicamente es un check extra contra `account.move` que la PWA ya sabe hacer.
-13. ¿Reglas antifraude: límite de canjes por periodo, monto máximo, exclusión de pedidos cancelados/devueltos (reversa de puntos)?
-14. ¿Cómo se descuentan puntos al canjear y qué registro queda (trazabilidad para auditoría)?
-15. ¿Cómo se refleja el canje en operación: producto de regalo agregado al siguiente pedido (línea con precio 0), descuento en la siguiente factura, o entrega directa en ruta? ¿Quién lo ve (ejecutivo, ruta, almacén)?
-16. ¿Cómo se cancela o revierte un canje (cliente se arrepiente, recompensa sin stock, error)? ¿Devuelve puntos?
-17. ¿Stock de recompensas físicas: se controla en Odoo (producto con inventario) o es ilimitado?
+**D. Reglas de negocio y control — DECIDIDAS por Yamil (2026-07-04); a Sebas le toca solo la implementación técnica**
+12. ~~¿Bloqueo de canje por saldo vencido?~~ **DECIDIDO: NO en fase inicial** (canal mayoritariamente de contado; sin fricción financiera en el piloto). `customer_blocked` por vencidos desactivado. **Pendiente técnico:** que el método de canje deje el hook listo para activar esta regla después sin cambiar el contrato del endpoint.
+13. ~~¿Límite de canjes por periodo?~~ **DECIDIDO: máximo 1 canje al mes por cliente.** Se valida **en Odoo, dentro del método atómico** — nunca en frontend. **Pendiente técnico (Sebas):** cómo contar el mes (mes calendario recomendado) y devolver `monthly_limit_reached` al exceder. Monto máximo por canje: no requerido en piloto.
+14. ¿Cómo se descuentan puntos al canjear y qué registro queda (trazabilidad para auditoría)? — pendiente técnico.
+15. ~~¿Cómo se refleja el canje en operación?~~ **DECIDIDO: dos modos iniciales** — producto gratis **con el siguiente pedido** y descuento **en la siguiente factura/pedido**. Entrega independiente en ruta queda FUERA de fase inicial. Cada recompensa lleva `delivery_mode`. **Pendiente técnico (Sebas):** cómo materializar cada modo (línea a precio 0 en el siguiente `sale.order` vs descuento en factura) y quién lo ve (ejecutivo/almacén).
+16. **Reversa de puntos — DECIDIDO: SÍ existe.** Si se cancela el pedido que generó puntos, se revierten. Recomendación técnica confirmada: **abonar puntos al entregar/facturar/confirmar cumplimiento, NO al crear el pedido** (minimiza reversas — conecta con pregunta 5). **Pendiente técnico (Sebas): proponer la mecánica exacta** para el caso "puntos ya gastados en un canje antes de la cancelación": saldo negativo controlado, ajuste pendiente, o bloquear siguientes canjes hasta compensar. También: reversa del canje mismo (recompensa sin stock, error) ¿devuelve puntos y con qué registro?
+17. ¿Stock de recompensas físicas: se controla en Odoo (producto con inventario) o es ilimitado? — pendiente técnico.
 
 **E. Permisos e integración**
 18. ¿El usuario de servicio de la PWA tiene permisos sobre los modelos loyalty? (primer paso concreto: probar `search_read` de `loyalty.card` por `partner_id`, read-only, sin tocar nada).
@@ -161,7 +161,7 @@ Principios: la PWA **nunca calcula ni almacena puntos** — solo muestra lo que 
 
 #### `GET /api/rewards/summary`
 - **Input:** ninguno (identidad por cookie).
-- **Output:** `{ program: {id, name}, balance: number, currency_label: "puntos", next_reward: {id, name, points_cost, points_missing} | null, expiring: {points, date} | null, level: {...} | null, blocked: {reason} | null }`.
+- **Output:** `{ program: {id, name}, balance: number, currency_label: "puntos", next_reward: {id, name, points_cost, points_missing} | null, expiring: {points, date} | null, level: {...} | null, blocked: {reason} | null }`. *(`blocked` en fase inicial es SIEMPRE `null` — el bloqueo por saldo vencido está desactivado por decisión de Yamil; el campo queda reservado para que una regla futura de Odoo pueda activarlo sin romper el contrato. La UI solo muestra bloqueos si Odoo los devuelve explícitamente.)*
 - **Validaciones:** sesión válida; card pertenece al partner. Si el partner no tiene `loyalty.card` → `balance: 0, no_card: true` (estado legítimo, no error).
 - **Errores:** 401 sin sesión; **502 si Odoo falla — NUNCA responder balance 0 por error** (la UI debe distinguir "tienes 0 puntos" de "no pudimos consultar").
 - **Dependencias Odoo:** `loyalty.card` (points, program_id, expiration si existe), `loyalty.reward` (para next_reward).
@@ -177,9 +177,9 @@ Principios: la PWA **nunca calcula ni almacena puntos** — solo muestra lo que 
 
 #### `POST /api/rewards/redeem`
 - **Input:** `{ reward_id: number, idempotency_key: string }` (la PWA genera la key igual que en pedidos).
-- **Output éxito:** `{ folio, reward_name, points_spent, new_balance, delivery: {mode: "next_order"|"route"|"discount", instructions} }`.
-- **Validaciones (server PWA):** sesión, `reward_id` numérico. **Todo lo demás lo valida Odoo dentro del método atómico** (saldo suficiente, recompensa activa, stock, cliente no bloqueado, key no usada).
-- **Errores (contrato):** 401 sesión · 400 input · **409 `insufficient_points`** (con saldo actual) · **410 `reward_unavailable`** (agotada/inactiva) · **423 `customer_blocked`** (regla de saldo vencido, si se adopta) · **409 `duplicate` → responder el folio ORIGINAL como replay, no error al usuario** · 502 Odoo caído (con garantía explícita: "no se descontaron puntos").
+- **Output éxito:** `{ folio, reward_name, points_spent, new_balance, delivery: { mode: "next_order" | "discount_next_invoice", instructions: string } }`. *(Modos de entrega DECIDIDOS: producto gratis con el siguiente pedido, o descuento en la siguiente factura/pedido. El modo `"route"` — entrega independiente en ruta — queda FUERA de la fase inicial; se documenta solo como valor futuro posible.)*
+- **Validaciones (server PWA):** sesión, `reward_id` numérico. **Todo lo demás lo valida Odoo dentro del método atómico** (saldo suficiente, recompensa activa, stock, **límite mensual no excedido**, key no usada).
+- **Errores (contrato):** 401 sesión · 400 input · **409 `insufficient_points`** (con saldo actual) · **410 `reward_unavailable`** (agotada/inactiva) · **429 (o 409) `monthly_limit_reached`** — DECIDIDO: máx. 1 canje/mes, validado en Odoo; copy: *"Ya usaste tu canje de este mes. Podrás canjear otra recompensa el próximo mes."* · **409 `duplicate` → responder el folio ORIGINAL como replay, no error al usuario** · 502 Odoo caído (con garantía explícita: "no se descontaron puntos"). *(`423 customer_blocked` NO existe en fase inicial — bloqueo por saldo vencido desactivado por decisión de Yamil; se reserva en el contrato como error futuro activable desde Odoo sin cambiar la PWA.)*
 - **Dependencias Odoo:** el método atómico de la pregunta 19. **Sin ese método, este endpoint no se construye** (no se acepta read-then-write en 2+ llamadas).
 - **Riesgos:** doble canje por doble tap/reintento (mitigado por idempotency_key + constraint en Odoo); canje con saldo desactualizado (mitigado porque el saldo se valida DENTRO de la transacción Odoo, no con el número que ve la UI); abuso (límite por periodo en Odoo, pregunta 13).
 
@@ -203,10 +203,10 @@ Variable server `REWARDS_MODE = off | teaser | live`:
 |--------|-----------|
 | **Doble canje** (doble tap, reintento de red, dos dispositivos) | Idempotency key + unique constraint + método atómico en Odoo (patrón ya probado en `orders/create` con `x_kold_idempotency_key`) |
 | **Carrera saldo** (dos canjes simultáneos con saldo para uno) | El saldo se valida dentro de la transacción Odoo, nunca en frontend |
-| **Programa mal configurado regala de más** (regla de puntos generosa por error) | Piloto con recompensas de bajo costo + límite de canjes/periodo + monitoreo primeras semanas (query diaria de canjes) |
-| **Canje sin capacidad operativa** (recompensa sin stock o ruta no la lleva) | `available` desde Odoo + modo de entrega explícito en el folio + visibilidad para el ejecutivo/ruta (notificación n8n como en pedidos) |
-| **Reversa** (pedido que generó puntos se cancela después del canje) | Definir política (pregunta 16): saldo negativo permitido vs descuento futuro; decidir ANTES de lanzar |
-| **Fraude/abuso** (cliente con saldo vencido canjeando) | Regla 12 si negocio la quiere; es un check barato |
+| **Programa mal configurado regala de más** (regla de puntos generosa por error) | Piloto con recompensas de bajo costo + **límite DECIDIDO de 1 canje/mes (validado en el método atómico de Odoo)** + monitoreo primeras semanas (query diaria de canjes) |
+| **Canje sin capacidad operativa** (recompensa sin stock) | `available` desde Odoo + `delivery_mode` explícito en el folio (solo `next_order` / `discount_next_invoice` en fase inicial) + visibilidad para el ejecutivo (notificación n8n como en pedidos) |
+| **Reversa** (pedido que generó puntos se cancela después del canje) | **DECIDIDO: la reversa existe.** Mitigación estructural: abonar puntos al entregar/facturar, no al crear pedido. Mecánica exacta del caso "puntos ya gastados" (saldo negativo controlado / ajuste pendiente / bloquear canjes hasta compensar) la propone Sebas en Odoo — pregunta 16 |
+| **Abuso de canjes** | Cubierto por el límite 1 canje/mes. El bloqueo por saldo vencido queda DESACTIVADO en fase inicial (decisión de negocio: canal de contado); la arquitectura lo deja activable después |
 | **Saldo mostrado ≠ saldo real** (momento de acumulación confuso) | Copy explícito: "los puntos se abonan cuando se entrega/factura tu pedido" según regla elegida (pregunta 5) |
 
 ### 3.4 Fase técnica intermedia admisible
