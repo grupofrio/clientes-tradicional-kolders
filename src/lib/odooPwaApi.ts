@@ -37,6 +37,7 @@ export interface PwaOrderParams {
   delivery_date?: string; // YYYY-MM-DD
   commitment_date?: string; // YYYY-MM-DD o datetime
   delivery_schedule?: string; // horario solicitado
+  note?: string; // observaciones (nivel orden) → sale.order.note
   session_id?: string;
   cart_token?: string;
 }
@@ -47,6 +48,7 @@ export interface PwaOrderResult {
   error?: string;
   duplicate?: boolean;
   order_id?: number;
+  name?: string; // nombre de la orden ("Sxxxxx") — desde PR#188 (éxito y duplicados)
   state?: string;
   total?: number;
   source?: string;
@@ -101,6 +103,7 @@ export async function createPwaOrder(
   if (params.delivery_date) data.x_delivery_date = params.delivery_date;
   if (params.commitment_date) data.commitment_date = params.commitment_date;
   if (params.delivery_schedule) data.x_studio_horario_de_entrega_solicitado = params.delivery_schedule;
+  if (params.note) data.note = params.note; // el endpoint acepta note|notes|observaciones (PR#188)
 
   const meta: Record<string, unknown> = { operation_id: params.operation_id };
   if (params.idempotency_key) meta.idempotency_key = params.idempotency_key;

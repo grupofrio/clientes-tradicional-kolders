@@ -45,13 +45,9 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { cart_lines, delivery_date, delivery_schedule, payment_method } = body;
+    const { cart_lines, delivery_date, delivery_schedule, payment_method, notes } = body;
     const clientSessionId: string | undefined = body?.session_id;
     const clientCartToken: string | undefined = body?.cart_token;
-    // GAP conocido: el endpoint oficial /kold/pwa/order/create no acepta hoy la
-    // nota general del pedido (`notes`) ni las notas por línea (`l.note`).
-    // Pendiente Sebas: agregar soporte de `note` en el controller. Mientras,
-    // las observaciones del cliente NO viajan (regresión menor a documentar).
 
     // ── Validación de input ────────────────────────────────────────────────
     if (!cart_lines || !Array.isArray(cart_lines) || cart_lines.length === 0) {
@@ -122,6 +118,18 @@ export async function POST(request: Request) {
     const operationId = `pwa-b2b-${sha.substring(0, 20)}`;
     const idempotencyKey = `b2b-${sha.substring(0, 24)}`;
 
+    // ── Observaciones → sale.order.note (el endpoint acepta note, PR#188) ──
+    // Componemos la nota general + las notas por línea para no perder nada
+    // (el endpoint solo tiene nota a nivel orden, no por línea).
+    const noteParts: string[] = [];
+    if (typeof notes === 'string' && notes.trim()) noteParts.push(notes.trim());
+    for (const l of cart_lines) {
+      if (typeof l.note === 'string' && l.note.trim()) {
+        noteParts.push(`${l.name || 'Producto'}: ${l.note.trim()}`);
+      }
+    }
+    const orderNote = noteParts.join('\n').slice(0, 2000);
+
     // ── Método de pago → vocabulario del endpoint ──
     const PAYMENT_MAP: Record<string, string> = {
       efectivo: 'Efectivo',
@@ -144,6 +152,7 @@ export async function POST(request: Request) {
         delivery_date,
         commitment_date: delivery_date,
         delivery_schedule: typeof delivery_schedule === 'string' ? delivery_schedule : undefined,
+        note: orderNote || undefined,
         session_id: clientSessionId,
         cart_token: clientCartToken,
       });
@@ -163,16 +172,8 @@ export async function POST(request: Request) {
     }
 
     const orderId = result.order_id;
-
-    // ── Nombre de la orden para la pantalla de éxito (LECTURA) ──
-    // Puente hasta que el endpoint devuelva `name`. Si falla, usamos el id.
-    let orderName = orderId ? `Pedido ${orderId}` : 'Pendiente';
-    if (orderId) {
-      try {
-        const rows = await callKw('sale.order', 'read', [[orderId]], { fields: ['name'] });
-        if (rows?.[0]?.name) orderName = rows[0].name;
-      } catch { /* fallback al id */ }
-    }
+    // El endpoint (PR#188) devuelve `name` en éxito y en duplicados.
+    const orderName = result.name || (orderId ? `Pedido ${orderId}` : 'Pendiente');
 
     // ── Notificación al ejecutivo (n8n) — no fatal ──
     const webhookUrl = process.env.N8N_WEBHOOK_ORDERS || process.env.N8N_WEBHOOK_URL_B2B || process.env.N8N_WEBHOOK_URL;

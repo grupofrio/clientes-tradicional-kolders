@@ -147,11 +147,13 @@ Errores (todos `ok:false` + `code`): `UNAUTHORIZED` (firma/api key), `VALIDATION
 5. En Odoo (lectura), validar el contrato del §10 sobre ese pedido.
 6. **Limpieza:** cancelar/archivar el pedido de prueba en Odoo.
 
-## 10-quater. Coordinación con Sebas (punto 6)
+## 10-quater. Gaps RESUELTOS por Odoo PR #188 (2026-07-06)
 
-Dos gaps del endpoint (mensaje listo en `MENSAJE_SEBAS_PWA_ENDPOINT.md`):
-1. **`order.name` en la respuesta** — ideal: el controller devuelve `"name": order.name` (1 línea). Temporal ya implementado: la PWA hace una **lectura RPC puente** del name por `order_id` (read-only, sin exponer credenciales). Al agregarse `name`, se elimina esa lectura.
-2. **`note` / observaciones** — el endpoint no acepta hoy la nota general ni las de línea; pedir soporte de `note` para no perder las observaciones del cliente.
+Ambos gaps fueron cerrados en el endpoint y la PWA ya los consume:
+1. **`order.name` en la respuesta** — ✅ el controller devuelve `"name": order.name` en éxito **y en duplicados**. La PWA usa `result.name` directamente y **se eliminó la lectura RPC puente** `sale.order.read`.
+2. **`note` / observaciones** — ✅ el endpoint acepta `note | notes | observaciones` → `sale.order.note` (máx 2000). La PWA envía las observaciones generales **+** las notas por línea compuestas (`"{producto}: {nota}"`) en un solo `note` (el endpoint no tiene nota por línea). Nada se pierde.
+
+Estado del flujo tras el ajuste: los **únicos** `callKw` RPC que quedan son 2 **lecturas** necesarias previas (`res.partner.search_read` para ejecutivo/compañía, `product.product.search_read` fallback de `price_unit`). Cero create/write/unlink/action_confirm por RPC.
 
 ## 10. Validación en Odoo tras el cambio (candidato GREEN PC#4)
 Sobre el pedido de prueba: `x_kold_order_source=pwa_b2b` · `x_operation_id` presente · `x_kold_idempotency_key` presente · `origin="PWA/pwa_b2b/{op}"` · `client_order_ref` útil · `x_kold_handoff_source="pwa_b2b_app"` · `x_kold_session_id`/`x_kold_cart_token` si se enviaron · impuestos aplicados · `state=draft` sin picking/factura · `create_uid ≠ DIRECCION GRUPO FRIO` · sin `origin=false` ni `x_operation_id=false`.
