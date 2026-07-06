@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { useB2BCartStore } from "@/store/cart";
 import { rehydrateReorder } from "@/lib/reorder";
+import ReorderConfirmModal from "@/components/ReorderConfirmModal";
 
 const STATUS_LABEL: Record<string, { label: string; cls: string }> = {
   draft: { label: "En revisión", cls: "bg-warning/15 text-warning" },
@@ -49,12 +50,15 @@ const QUICK_LINKS = [
 export default function HomePage() {
   const router = useRouter();
   const addItem = useB2BCartStore((state) => state.addItem);
+  const clearCart = useB2BCartStore((state) => state.clearCart);
+  const cartCount = useB2BCartStore((state) => state.getTotalItems());
 
   const [partner, setPartner] = useState<{ name?: string } | null>(null);
   const [orders, setOrders] = useState<HomeOrder[]>([]);
   const [loadingOrders, setLoadingOrders] = useState(true);
   const [ordersError, setOrdersError] = useState(false);
   const [reordering, setReordering] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   const fetchHome = () => {
     fetch("/api/account/profile")
@@ -95,10 +99,13 @@ export default function HomePage() {
     (o) => o.state !== "cancel" && Array.isArray(o.lines) && o.lines.length > 0,
   );
 
-  const handleRepeat = async () => {
+  // Ejecuta la recompra. `replace=true` vacía el carrito antes de rehidratar;
+  // `false` suma al carrito existente (comportamiento original).
+  const runRepeat = async (replace: boolean) => {
     if (!usualOrder || reordering) return;
     setReordering(true);
     try {
+      if (replace) clearCart();
       const { added, omitted } = await rehydrateReorder(usualOrder, addItem);
       if (omitted.length > 0) {
         alert(
@@ -106,6 +113,7 @@ export default function HomePage() {
         );
       }
       if (added > 0) {
+        setConfirmOpen(false);
         router.push("/cart");
       } else if (omitted.length === 0) {
         alert("Este pedido no tiene productos para repetir.");
@@ -115,6 +123,16 @@ export default function HomePage() {
     } finally {
       setReordering(false);
     }
+  };
+
+  // Si el carrito ya tiene productos, preguntamos antes de duplicar cantidades.
+  const handleRepeat = () => {
+    if (!usualOrder || reordering) return;
+    if (cartCount > 0) {
+      setConfirmOpen(true);
+      return;
+    }
+    runRepeat(false);
   };
 
   const status = usualOrder ? STATUS_LABEL[usualOrder.state] : null;
@@ -263,6 +281,14 @@ export default function HomePage() {
           ))}
         </div>
       </div>
+
+      <ReorderConfirmModal
+        open={confirmOpen}
+        busy={reordering}
+        onReplace={() => runRepeat(true)}
+        onAdd={() => runRepeat(false)}
+        onCancel={() => setConfirmOpen(false)}
+      />
     </div>
   );
 }
