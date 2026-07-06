@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useB2BCartStore } from "@/store/cart";
+import { rehydrateReorder } from "@/lib/reorder";
 import { useRouter } from "next/navigation";
 import { Loader2, ArrowLeft, RefreshCw, ChevronDown, ChevronUp } from "lucide-react";
 
@@ -41,41 +42,13 @@ export default function OrderHistory() {
     fetchOrders();
   };
 
-  // Reordenar rehidrata cada línea desde el catálogo actual (precio, SKU,
-  // tax_rate y empaque vigentes) en lugar de copiar datos históricos del
-  // pedido. Productos que ya no existen o no están disponibles se omiten
-  // avisando al cliente — nunca se agregan líneas rotas al carrito.
+  // Reordenar rehidrata desde el catálogo actual vía el helper compartido
+  // con /home (src/lib/reorder.ts) — misma lógica segura en ambos lugares.
   const handleReorder = async (order: any) => {
      if (reorderingId !== null) return;
      setReorderingId(order.id);
      try {
-        const res = await fetch('/api/catalog');
-        if (!res.ok) throw new Error('catalog');
-        const catalog = await res.json();
-        if (!Array.isArray(catalog)) throw new Error('catalog');
-
-        const byId = new Map<number, any>(catalog.map((c: any) => [c.id, c]));
-        const omitted: string[] = [];
-        let added = 0;
-
-        (order.lines || []).forEach((line: any) => {
-            const item = byId.get(line.product_id);
-            if (!item) {
-                omitted.push(line.name.split('\n')[0]);
-                return;
-            }
-            addItem({
-                product_id: item.id,
-                name: item.name,
-                sku: item.sku || '',
-                price: item.price,
-                tax_rate: item.tax_rate || 0,
-                uom_name: item.uom,
-                qty: line.qty,
-                qtyPerPage: item.boxSize || 1,
-            });
-            added++;
-        });
+        const { added, omitted } = await rehydrateReorder(order, addItem);
 
         if (omitted.length > 0) {
             alert(`Estos productos ya no están disponibles y no se agregaron:\n- ${omitted.join('\n- ')}`);
