@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { useB2BCartStore } from "@/store/cart";
 import { rehydrateReorder } from "@/lib/reorder";
+import ReorderConfirmModal from "@/components/ReorderConfirmModal";
 import { useRouter } from "next/navigation";
 import { Loader2, ArrowLeft, RefreshCw, ChevronDown, ChevronUp } from "lucide-react";
 
@@ -12,8 +13,11 @@ export default function OrderHistory() {
   const [loadError, setLoadError] = useState(false);
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [reorderingId, setReorderingId] = useState<number | null>(null);
+  const [confirmOrder, setConfirmOrder] = useState<any | null>(null);
 
   const addItem = useB2BCartStore(state => state.addItem);
+  const clearCart = useB2BCartStore(state => state.clearCart);
+  const cartCount = useB2BCartStore(state => state.getTotalItems());
 
   const fetchOrders = () => {
     fetch('/api/b2b/orders/history')
@@ -44,16 +48,19 @@ export default function OrderHistory() {
 
   // Reordenar rehidrata desde el catálogo actual vía el helper compartido
   // con /home (src/lib/reorder.ts) — misma lógica segura en ambos lugares.
-  const handleReorder = async (order: any) => {
+  // `replace=true` vacía el carrito antes; `false` suma al existente.
+  const runReorder = async (order: any, replace: boolean) => {
      if (reorderingId !== null) return;
      setReorderingId(order.id);
      try {
+        if (replace) clearCart();
         const { added, omitted } = await rehydrateReorder(order, addItem);
 
         if (omitted.length > 0) {
             alert(`Estos productos ya no están disponibles y no se agregaron:\n- ${omitted.join('\n- ')}`);
         }
         if (added > 0) {
+            setConfirmOrder(null);
             router.push("/cart");
         } else if (omitted.length === 0) {
             alert('Este pedido no tiene productos para reordenar.');
@@ -63,6 +70,16 @@ export default function OrderHistory() {
      } finally {
         setReorderingId(null);
      }
+  };
+
+  // Si el carrito ya tiene productos, preguntamos antes de duplicar cantidades.
+  const handleReorder = (order: any) => {
+     if (reorderingId !== null) return;
+     if (cartCount > 0) {
+        setConfirmOrder(order);
+        return;
+     }
+     runReorder(order, false);
   };
 
   const getStatusBadge = (state: string) => {
@@ -171,6 +188,14 @@ export default function OrderHistory() {
           ))
         )}
       </div>
+
+      <ReorderConfirmModal
+        open={confirmOrder !== null}
+        busy={reorderingId !== null}
+        onReplace={() => confirmOrder && runReorder(confirmOrder, true)}
+        onAdd={() => confirmOrder && runReorder(confirmOrder, false)}
+        onCancel={() => setConfirmOrder(null)}
+      />
     </div>
   );
 }
