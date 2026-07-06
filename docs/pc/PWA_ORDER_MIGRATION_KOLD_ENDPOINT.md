@@ -119,5 +119,39 @@ Errores (todos `ok:false` + `code`): `UNAUTHORIZED` (firma/api key), `VALIDATION
 - `ODOO_URL` (ya) · `ODOO_PWA_API_KEY` (ya) · `ODOO_PWA_API_SECRET` (ya). Confirmar en Vercel que **existen en el entorno de producción y preview** (no imprimir valores).
 - Se conservan `ODOO_SERVICE_USER/PASSWORD` para lecturas RPC (catálogo/perfil/facturas). `N8N_WEBHOOK_ORDERS` se mantiene (notificación).
 
+## 10-bis. Verificación previa al merge (código de la rama PR #17, 2026-07-06)
+
+| # | Punto | Resultado |
+|---|-------|-----------|
+| 1 | PR #17 en draft | ✅ `draft:true`, `f279c69` |
+| 2 | **Cero `sale.order.create` por RPC** en el flujo de pedido | ✅ grep en toda la rama = 0; los únicos `callKw` del route son **lecturas** (`res.partner.search_read`, `product.product.search_read`, `sale.order.read`); sin `action_confirm` |
+| 3 | `N8N_WEBHOOK_ORDERS` = solo notificación post-create | ✅ el `fetch(webhookUrl)` está **después** de `createPwaOrder`, guardado por `!isDuplicate`; no participa en la creación |
+| 4 | Nunca llama `/kold/pwa/web/order/create` | ✅ única URL usada = `/kold/pwa/order/create` (firmado); la web pública solo se menciona en un comentario "NUNCA se usa" |
+| 5 | Secretos solo server-side | ✅ `ODOO_PWA_API_KEY/SECRET` leídos por `process.env` en `lib/odooPwaApi.ts` (server-only); **sin `NEXT_PUBLIC`**; el lib solo lo importa el route (server) y su test — ningún `'use client'`. **Prueba dura:** ni el secreto ni la URL del endpoint aparecen en `.next/static` (bundle cliente) |
+| 7 | Notes/observaciones | ⚠️ el carrito SÍ envía `notes` (Observaciones) y `l.note` por línea; **se pierden** (el endpoint no los acepta; `l.note` solo alimenta el fingerprint de idempotencia). GAP documentado en código y §7 |
+
+## 10-ter. Runbook de QA de integración en preview (punto 8) — requiere S/N
+
+**Advertencia:** crear un pedido por el endpoint escribe una orden (draft) REAL en el Odoo productivo. Este runbook necesita **S/N de Yamil** y deja el pedido de prueba para cancelar/archivar en Odoo al final.
+
+**Pre-requisitos (infra/Sebas, sin exponer valores):**
+1. En Vercel (entorno **preview**): `ODOO_PWA_API_KEY`, `ODOO_PWA_API_SECRET`, `ODOO_URL` presentes.
+2. **Preview mutation guard:** agregar el partner de prueba **54907** a `PREVIEW_MUTATIONS_ALLOWLIST` en el env de preview (si no, el guard bloquea la creación con 403 — comportamiento correcto).
+3. Odoo: `invoice_controller.pwa_enforce_signature=1`, la API key mapeada a un usuario técnico (no DIRECCION), reloj sincronizado.
+
+**Pasos:**
+1. Magic link fresco por WhatsApp para el partner de prueba → abrir el **preview** en desktop con sesión Vercel (el preview está tras SSO).
+2. Armar un carrito pequeño (1-2 productos) → Confirmar pedido.
+3. Verificar pantalla **"Pedido recibido Sxxxxx"** (o el id/operation_id si el name aún no viene del endpoint).
+4. **Idempotencia:** volver atrás y reintentar el MISMO carrito → debe devolver el MISMO pedido (DUPLICATE_OPERATION), sin crear un segundo.
+5. En Odoo (lectura), validar el contrato del §10 sobre ese pedido.
+6. **Limpieza:** cancelar/archivar el pedido de prueba en Odoo.
+
+## 10-quater. Coordinación con Sebas (punto 6)
+
+Dos gaps del endpoint (mensaje listo en `MENSAJE_SEBAS_PWA_ENDPOINT.md`):
+1. **`order.name` en la respuesta** — ideal: el controller devuelve `"name": order.name` (1 línea). Temporal ya implementado: la PWA hace una **lectura RPC puente** del name por `order_id` (read-only, sin exponer credenciales). Al agregarse `name`, se elimina esa lectura.
+2. **`note` / observaciones** — el endpoint no acepta hoy la nota general ni las de línea; pedir soporte de `note` para no perder las observaciones del cliente.
+
 ## 10. Validación en Odoo tras el cambio (candidato GREEN PC#4)
 Sobre el pedido de prueba: `x_kold_order_source=pwa_b2b` · `x_operation_id` presente · `x_kold_idempotency_key` presente · `origin="PWA/pwa_b2b/{op}"` · `client_order_ref` útil · `x_kold_handoff_source="pwa_b2b_app"` · `x_kold_session_id`/`x_kold_cart_token` si se enviaron · impuestos aplicados · `state=draft` sin picking/factura · `create_uid ≠ DIRECCION GRUPO FRIO` · sin `origin=false` ni `x_operation_id=false`.
