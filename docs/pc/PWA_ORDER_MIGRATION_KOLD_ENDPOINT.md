@@ -155,5 +155,12 @@ Ambos gaps fueron cerrados en el endpoint y la PWA ya los consume:
 
 Estado del flujo tras el ajuste: los **únicos** `callKw` RPC que quedan son 2 **lecturas** necesarias previas (`res.partner.search_read` para ejecutivo/compañía, `product.product.search_read` fallback de `price_unit`). Cero create/write/unlink/action_confirm por RPC.
 
+## 10-quinquies. Precios e impuestos — cómo se comporta el endpoint (verificado en el controller)
+
+- **Precio de línea (`price_unit`): el endpoint lo CONFÍA del payload de la PWA.** `_normalize_order_lines` exige `price_unit` por línea y lo usa directo (rechaza líneas sin precio: *"Cada línea requiere 'price_unit' para evitar precios inconsistentes"*). **No** recalcula el precio de línea desde la pricelist. `_get_price`/pricelist solo se usa en el endpoint de **catálogo**, no en `order/create`.
+- **Pricelist de la orden:** el endpoint sí resuelve y setea `pricelist_id` en la cabecera (referencia/consistencia), pero la línea mantiene el `price_unit` enviado.
+- **Impuestos: los computa ODOO.** La línea se crea con `product_id/qty/price_unit` **sin `tax_id`** → el motor fiscal de Odoo aplica los impuestos del producto/compañía. El `total` de la respuesta = `amount_total` con impuestos de Odoo.
+- **Consecuencia para la PWA:** ya envía el precio correcto (resuelto con `lib/pricelist`, misma fuente que el catálogo). **Aserción obligatoria del QA:** el `price_unit` persistido en Odoo == el precio que vio el cliente en el carrito, y `amount_tax`/`amount_total` correctos (IVA 0% en productos GF → tax=0, total=subtotal).
+
 ## 10. Validación en Odoo tras el cambio (candidato GREEN PC#4)
 Sobre el pedido de prueba: `x_kold_order_source=pwa_b2b` · `x_operation_id` presente · `x_kold_idempotency_key` presente · `origin="PWA/pwa_b2b/{op}"` · `client_order_ref` útil · `x_kold_handoff_source="pwa_b2b_app"` · `x_kold_session_id`/`x_kold_cart_token` si se enviaron · impuestos aplicados · `state=draft` sin picking/factura · `create_uid ≠ DIRECCION GRUPO FRIO` · sin `origin=false` ni `x_operation_id=false`.
