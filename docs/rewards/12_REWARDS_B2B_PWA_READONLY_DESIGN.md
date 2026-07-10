@@ -211,6 +211,15 @@ v1 y v1.1 **no** requieren activar Fase 2 (v1 cosmético; v1.1 cálculo efímero
 ---
 
 ## 8. Siguiente paso (cuando lo autorices)
-1. Versionar este doc a `docs/rewards/12_...` vía **PR docs-only draft** (sin merge).
-2. Con S/N: **PR PWA de v1 coming soon** (flag de front, card + `/rewards`, **cero Odoo**) — auditable y reversible.
-3. En paralelo: pasar el **spec del endpoint** a Sebas para v1.1.
+Este documento ya está versionado en **PR #19 (docs-only, draft)**. Pasos:
+
+1. **Con S/N: mergear PR #19** (docs-only) — este documento.
+2. **Con S/N separado: arrancar PR PWA de v1 coming soon** — auditable y reversible:
+   - `NEXT_PUBLIC_REWARDS_MODE=coming_soon`
+   - card en `/home`
+   - ruta `/rewards`
+   - **cero Odoo**
+   - **cero endpoint**
+   - **cero saldo**
+   - **cero canje**
+3. **En paralelo:** pasar el **spec del endpoint** (`POST /kold/pwa/rewards/summary`) a Sebas para v1.1.
