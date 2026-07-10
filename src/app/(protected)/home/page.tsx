@@ -9,12 +9,13 @@ import {
   ClipboardList,
   FileText,
   User,
-  Star,
   ChevronRight,
 } from "lucide-react";
 import { useB2BCartStore } from "@/store/cart";
 import { rehydrateReorder } from "@/lib/reorder";
 import ReorderConfirmModal from "@/components/ReorderConfirmModal";
+import RewardsSummary from "@/components/RewardsSummary";
+import { rewardsVisibleV1 } from "@/lib/rewardsMode";
 
 const STATUS_LABEL: Record<string, { label: string; cls: string }> = {
   draft: { label: "En revisión", cls: "bg-warning/15 text-warning" },
@@ -244,20 +245,8 @@ export default function HomePage() {
           )}
         </div>
 
-        {/* Teaser de recompensas — SIN datos: el programa aún no está en vivo */}
-        <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4 flex items-start gap-3">
-          <div className="w-9 h-9 rounded-xl bg-amber-100 flex items-center justify-center flex-shrink-0">
-            <Star size={17} className="text-amber-600" />
-          </div>
-          <div>
-            <h3 className="font-black text-amber-800 text-sm leading-tight">
-              Muy pronto tus compras sumarán puntos y recompensas Grupo Frío.
-            </h3>
-            <p className="text-[11px] text-amber-700/80 mt-1 font-medium">
-              Estamos preparando beneficios para clientes frecuentes.
-            </p>
-          </div>
-        </div>
+        {/* Recompensas v1 — card "Próximamente" gateada por NEXT_PUBLIC_REWARDS_MODE. Sin datos. */}
+        {rewardsVisibleV1() && <RewardsSummary variant="card" />}
 
         {/* Accesos rápidos */}
         <div className="bg-card rounded-2xl border border-border overflow-hidden shadow-sm">

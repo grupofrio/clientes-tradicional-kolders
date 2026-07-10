@@ -1,9 +1,10 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { User, LogOut, FileText, ClipboardList, Package, Phone, AlertTriangle, Loader2 } from "lucide-react";
+import { LogOut, FileText, ClipboardList, Package, Phone, AlertTriangle, Loader2, Gift } from "lucide-react";
 import Link from "next/link";
 import { useB2BCartStore } from "@/store/cart";
+import { rewardsVisibleV1 } from "@/lib/rewardsMode";
 
 export default function AccountPage() {
   const router = useRouter();
@@ -182,6 +183,18 @@ export default function AccountPage() {
             </div>
             <span className="text-muted-foreground text-sm">›</span>
           </Link>
+          {rewardsVisibleV1() && (
+            <Link href="/rewards" className="flex items-center gap-3 p-4 border-b border-border active:bg-muted/50 transition-colors">
+              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary flex-shrink-0">
+                <Gift size={18} />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-bold text-foreground text-sm">Recompensas Grupo Frío</h3>
+                <p className="text-[10px] text-muted-foreground">Próximamente</p>
+              </div>
+              <span className="text-muted-foreground text-sm">›</span>
+            </Link>
+          )}
           <Link href="/catalog" className="flex items-center gap-3 p-4 active:bg-muted/50 transition-colors">
             <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary flex-shrink-0">
               <Package size={18} />
